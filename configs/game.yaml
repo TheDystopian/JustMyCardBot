@@ -1,9 +1,0 @@
-maxPlayers:
-  player: 2
-  judge: 1
-
-timeout: 120
-
-AFK:
-  compensation: 5
-  punish: 5
