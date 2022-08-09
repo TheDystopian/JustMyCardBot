@@ -1,0 +1,967 @@
+DB:
+  dbname: <DB NAME>
+  user: <DB USER>
+  passwd: <DB PASSWORD>
+  host: <DB IP ADDRESS>
+  port: <DB PORT>
+
+VK:
+  key: <VK API KEY>
+  groups:
+    devs:
+      - DEV 1
+      - DEV 2
+      - DEV ...
+    admins:
+      - ADMIN 1
+      - ADMIN 2
+      - ADMIN ...
+
+status:
+  defaultStatus: 0
+
+  defaultstatus: 7
+
+  names:
+    - STATUS 1
+    - STATUS 2
+    - STATUS 3
+    - STATUS 4
+
+  battles:
+    amount:
+      - 5
+      - 6
+      - 7
+      - 32767
+
+    judge:
+      -
+        balance: 1
+      -
+        balance: 1
+      -
+        balance: 1
+      -
+        balance: 1000
+
+    win:
+      -
+        balance: 10
+        scraps: 3
+      -
+        balance: 10
+        scraps: 3
+      -
+        balance: 15
+        scraps: 3
+      -
+        balance: 10000
+        scraps: 5000 
+
+    lose:
+      -
+        balance: 5
+      -
+        balance: 10
+      -
+        balance: 10
+      -
+        balance: 10000 
+
+  streak:
+    count:
+      win:
+        - 5
+        - 5
+        - 5
+        - 5
+
+      lose:
+        - 5
+        - 5
+        - 5
+        - 5
+
+    reward:
+      win:
+        -
+          balance: 20
+        -
+          balance: 20
+        -
+          balance: 20
+        -
+          balance: 20
+
+      lose:
+        -
+          scraps: 5
+        -
+          scraps: 5
+        -
+          scraps: 5
+        -
+          scraps: 5
+ 
+lobby:
+  maxPlayers:
+    player: 2
+    judge: 1
+
+  timeout: 60
+
+  AFK:
+    compensation: 5
+    punish: 5
+
+ranks:
+  expChange:
+    -
+      win: 15
+      lose: 5
+    -
+      win: 15
+      lose: 10
+    -
+      win: 10
+      lose: 10
+    -
+      win: 8
+      lose: 10
+
+  levels:
+    '0':
+      name: RANK 1
+      expGroup: 0
+      reward:
+        balance: 10
+    '50':
+      name: RANK 2
+      expGroup: 1
+      reward:
+        balance: 30
+    '75':
+      name: RANK 3
+      expGroup: 2
+      reward:
+        balance: 20
+        scraps: 5
+    '125':
+      name: RANK 4
+      expGroup: 3
+      reward:
+        cardPack:
+          - 1
+
+game:
+  packs:
+    - 
+      price: 100
+      rarities:
+        '2': 15
+    - 
+      price: 150
+      rarities:
+        '2': 85
+        '3': 10
+    - 
+      price: 200
+      rarities:
+        '3': 92
+        '4': 8
+    - 
+      price: 170
+      rarities: 0
+
+  cards:
+    upgrade:
+      cost:
+        # Formula
+        #
+        # defaultPrice + rarityRatio*((card level)^dafaultPower)
+
+        defaultPrice: 20
+
+        defaultPower: 1.585
+
+        rarityRatios:
+          '1': 5
+          '2': 10
+          '3': 15
+          '4': 20
+
+      repeats:
+        '1': 
+          - 3
+          - 2
+        '2': 
+          - 3
+          - 2
+        '3': 
+          - 2
+          - 2
+        '4': 
+          - 2
+          - 2
+    
+    break: 
+      minimumCards: 3
+      multiplier: 0.7
+     
+    indicators:
+      '4': 🟨
+      '3': 🟪
+      '2': 🟦
+      '1': 🟩
+
+    defaultChance:
+      '4': 2
+      '3': 5
+      '2': 10
+
+    noRandomIndicator: '-'
+
+    cards:
+      -
+        name: CARD 1
+        rarity: 1
+        photo:
+          lvl1: 
+            - VK PHOTO ID FOR CARD
+          lvl2:
+            - VK PHOTO ID FOR CARD
+            - VK PHOTO ID FOR CARD
+            - VK PHOTO ID FOR CARD
+            
+      -
+        name: CARD 2
+        rarity: 2
+        photo:
+          lvl1: 
+            - VK PHOTO ID FOR CARD
+          lvl2:
+            - VK PHOTO ID FOR CARD
+            - VK PHOTO ID FOR CARD
+            - VK PHOTO ID FOR CARD
+      -
+        name: CARD 3
+        rarity: 3
+        photo:
+          lvl1: 
+            - VK PHOTO ID FOR CARD
+          lvl2:
+            - VK PHOTO ID FOR CARD
+            - VK PHOTO ID FOR CARD
+            - VK PHOTO ID FOR CARD
+      -
+        name: CARD 4
+        rarity: 4
+        photo:
+          lvl1:
+          lvl1: 
+            - VK PHOTO ID FOR CARD
+          lvl2:
+            - VK PHOTO ID FOR CARD
+            - VK PHOTO ID FOR CARD
+            - VK PHOTO ID FOR CARD
+
+commands:
+  call:
+  - '.'
+  - '/'
+  - '#'
+  - '!'
+
+  commands:
+    win:
+      permissions:
+        - bot
+      keywords:
+        - ПОБЕДА
+
+    flip:
+      permissions:
+        - bot
+        - chat
+      keywords:
+        - ФЛИП 
+   
+    upgrade:
+      permissions:
+        - chat
+        - bot
+      keywords:
+        - АП
+        - АПГРЕЙД 
+
+    profile:
+      permissions:
+        - chat
+        - bot
+      keywords:
+        - П
+        - ПРОФ
+
+    showCards:
+      permissions:
+        - chat
+        - bot
+      keywords:
+        - КАРТА
+        - К
+
+    shop:
+      permissions:
+        - chat
+        - bot
+      keywords:
+        - МАГАЗИН
+        - М
+      payload:
+        dialog: shop_inline
+
+    give:
+      permissions:
+        - chat
+        - bot
+        - admins
+      keywords:
+        - ДАТЬ
+
+    remove:
+      permissions:
+        - chat
+        - bot
+        - admins
+      keywords:
+        - СНЯТЬ
+        - УБРАТЬ
+
+    chance:
+      permissions:
+        - chat
+        - bot
+      keywords:
+        - ШАНС
+
+    destroy:
+      permissions:
+        - chat
+        - bot
+      keywords:
+        - РАЗОРВАТЬ
+        - РАЗР
+
+
+    pack_dialog:
+      permissions:
+        - chat
+        - bot
+      keywords:
+        - ПАКИ
+      payload:
+        dialog: packs_inline
+
+    removeKB:
+      permissions:
+        - chat
+      keywords:
+        - УБРАТЬКЛАВУ
+      payload:
+        dialog: kb_placeholder
+
+    game:
+      permissions:
+        - bot
+      keywords:
+        - ИГРА
+
+  args:
+    judge:
+      keywords:
+        - СУДЬЯ
+
+    player:
+      keywords:
+        - ИГРОК
+
+    stop:
+      keywords:
+        - СТОП
+
+    rarity:
+      keywords:
+        - Р
+        - РЕД
+        - РЕДКОСТЬ
+
+    level:
+      keywords:
+        - УР
+        - УРОВЕНЬ
+
+    repeats:
+      keywords:
+        - ПОВТОРКИ
+        - ПОВТ
+
+    scraps:
+      keywords:
+        - ОБР
+        - ОБРЫВКИ
+
+    balance:
+      keywords:
+        - БАЛАНС
+        - БАЛ
+
+    pack:
+      keywords:
+        - ПАК
+
+    cards:
+      keywords:
+        - КАРТА
+        - К
+
+    win:
+      keywords:
+        - ПОБЕДА
+
+    lose:
+      keywords:
+        - ПОРАЖЕНИЕ
+
+dialogs:
+  greeting:
+    message: |
+      Приветствие
+      Напиши меня
+      Текст
+    keyboard: 
+      buttons:
+      - -
+          color: primary
+          action:
+            type: text
+            label: Добавить карты
+            payload:
+              -
+                addCardsPool:
+                  - 1
+                  - 2
+                  - 3
+              -
+                dialog: profile
+
+
+  profile:
+    message: |
+      Ваш статус: {status}
+      Ваш ранг: {rank}
+      Ваш баланс: {balance}
+      Количество обрывков: {scraps}
+      Осталось боев: {battles}
+      
+    keyboard:
+      buttons:
+      - - action:
+            type: text
+            label: Магазин
+            payload:
+              dialog: shop
+          color: primary
+        - action:
+            type: text
+            label: Коллекции
+            payload: 
+              dialog:
+                collection
+          color: primary
+      - - action:
+            type: text
+            label: Прокачка
+            payload: 
+              upgrade: ''
+          color: primary
+        - action:
+            type: text
+            label: Паки
+            payload: 
+              dialog:
+                packs
+          color: primary
+      - - action:
+            type: text
+            label: Найти игру
+            payload: 
+              dialog:
+                game_search
+          color: primary
+
+  shop:
+    message: |
+      Магазин
+
+      Обычный пак: 100 монет
+      Шансы выпадения:
+        85% - обычная
+        15% - редкая
+
+      Редкий пак: 150 монет
+      Шансы выпадения: 
+        5% - обычная
+        85% - редкая
+        10% - эпическая
+
+      Эпический пак: 200 монет
+      Шансы выпадения:
+        92% - эпическая
+        8% - легендарная
+      
+      Рандом пак: 170 монет
+      Шансы выпадения: 
+        Любая карта 1 уровня
+
+      Ваш баланс: {balance}
+    keyboard: 
+      buttons:
+      - - action:
+            type: text
+            label: Обычный
+            payload: 
+              getPack: 0
+          color: primary
+        - action:
+            type: text
+            label: Редкий
+            payload: 
+              getPack: 1
+          color: primary
+        - action:
+            type: text
+            label: Эпический
+            payload: 
+              getPack: 2
+          color: primary
+        - action:
+            type: text
+            label: Случайный
+            payload: 
+              getPack: 3
+          color: primary
+      - - action:
+            type: text
+            label: Назад
+            payload:
+              dialog: profile
+          color: primary
+
+
+  notEnoughMoney:
+    message: |
+      У вас не хватает денег. Продолжайте играть, чтобы заработать
+
+  notEnoughScraps:
+    message: |
+      У вас не хватает обрывков. 
+  
+  purchase:
+    message: |
+      Вам выпала карта 
+      {card}
+
+  upgraded:
+    message: |
+      Улучшена карта
+      
+      {card}
+
+  upgradeFail:
+    message: |
+      У вас нет подходящих карт для улучшения
+
+  collection:
+    message: |
+      Выберите уровень
+
+    keyboard: 
+      buttons:
+      - - action:
+            type: text
+            label: 1 уровень
+            payload: 
+              showCards:
+                level: '1'
+
+          color: primary
+        - action:
+            type: text
+            label: 2 уровень
+            payload: 
+              showCards:
+                level: '2'
+
+          color: primary
+      - - action:
+            type: text
+            label: Назад
+            payload:
+              dialog:
+                profile
+          color: primary
+
+  noCards:
+    message: |
+      У вас нет карт  такого типа
+
+  noCardsPlr:
+    message: |
+      У этого игрока нету карт
+
+  poolcards:
+    message: |
+      Вам были выданы следующие карты
+      {card}
+      
+      Получить их можно в коллекции
+    keyboard: 
+      buttons:
+      - - action:
+            type: text
+            label: Назад
+            payload: 
+              dialog:
+                profile
+          color: primary
+
+  firstPlayer:
+    message: |
+      Ходит первый игрок
+
+  secondPlayer:
+    message: |
+      Ходит второй игрок
+
+  profile_inline_otheruser:
+    message: |
+      Его статус: {status}
+      Его ранг: {rank}
+      Осталось боев: {battles}
+
+  shop_inline:
+    keyboard: 
+      buttons:
+      - - action:
+            type: text
+            label: Обычный
+            payload: 
+              getPack: 0
+          color: primary
+        - action:
+            type: text
+            label: Редкий
+            payload: 
+              getPack: 1
+          color: primary
+      - - action:
+            type: text
+            label: Эпический
+            payload: 
+              getPack: 2
+          color: primary
+        - action:
+            type: text
+            label: Случайный
+            payload: 
+              getPack: 3
+          color: primary
+      inline: true
+
+    message: |
+      Магазин
+
+      Обычный пак: 100 монет
+      Шансы выпадения:
+        85% - обычная
+        15% - редкая
+
+      Редкий пак: 150 монет
+      Шансы выпадения: 
+        5% - обычная
+        85% - редкая
+        10% - эпическая
+
+      Эпический пак: 200 монет
+      Шансы выпадения:
+        92% - эпическая
+        8% - легендарная
+      
+      Рандом пак: 170 монет
+      Шансы выпадения: 
+        Любая карта 1 уровня
+
+      Ваш баланс: {balance}
+
+  packs:
+    message: |
+      Ваши паки:
+
+      Обычные: {packs[0]}
+      Редкие: {packs[1]}
+      Эпические: {packs[2]}
+      Рандом: {packs[3]}
+
+    keyboard: 
+      buttons:
+      - - action:
+            type: text
+            label: Обычный
+            payload: 
+              openPack: 0
+          color: primary
+        - action:
+            type: text
+            label: Редкий
+            payload: 
+              openPack: 1
+          color: primary
+        - action:
+            type: text
+            label: Эпический
+            payload: 
+              openPack: 2
+          color: primary
+        - action:
+            type: text
+            label: Рандом
+            payload: 
+              openPack: 3
+          color: primary
+      - - action:
+            type: text
+            label: В профиль
+            payload: 
+              dialog: profile
+          color: primary
+
+
+  noPack:
+    message: |
+      У вас нет этого пака
+
+  cantError:
+    message: |
+      Воу... А я так не могу...
+
+  cardDoesNotExist:
+    message: |
+      Такой карты пока не существует
+
+  wrongNumber:
+    message: |
+      Упс... А номер неправильный
+
+  noDestoyableCards:
+    message: |
+      Союз нерушимый республик свободных...
+      Ой, я имел в виду ваши карты
+
+  gotPack:
+    message: |
+      Перейти к пакам?
+
+    keyboard: 
+      buttons:
+        - - action:
+              type: text
+              label: К пакам
+              payload: 
+                dialog: packs
+            color: primary
+        - - action:
+              type: text
+              label: В магазин
+              payload:
+                dialog: shop
+            color: primary
+        - - action:
+              type: text
+              label: В профиль
+              payload: 
+                dialog: profile
+            color: primary
+
+
+  packs_inline:
+    message: |
+      Ваши паки:
+
+      Обычные: {packs[0]}
+      Редкие: {packs[1]}
+      Эпические: {packs[2]}
+      Рандом: {packs[3]}
+
+    keyboard:       
+      inline: true
+      buttons:
+      - - action:
+            type: text
+            label: Обычный
+            payload: 
+              openPack: 0
+          color: primary
+        - action:
+            type: text
+            label: Редкий
+            payload: 
+              openPack: 1
+          color: primary
+        - action:
+            type: text
+            label: Эпический
+            payload: 
+              openPack: 2
+          color: primary
+        - action:
+            type: text
+            label: Рандом
+            payload: 
+              openPack: 3
+          color: primary
+      - - action:
+            type: text
+            label: В профиль
+            payload: 
+              dialog: profile
+          color: primary
+
+  kb_placeholder:
+    message: |
+      Изыйди, клава
+    keyboard: 
+      buttons: []
+
+  lobbySearch:
+    message: Идет поиск лобби. Пожалуйста подождите
+    keyboard: 
+      buttons:
+        - - action:
+              type: text
+              label: Остановить поиск
+              payload: 
+                game: stop
+            color: primary
+    
+
+  stopLobbySearch:
+    message: |
+      Поиск лобби отменен
+
+    keyboard:
+      buttons:
+        - - action:
+              type: text
+              label: В профиль
+              payload: 
+                dialog: profile
+            color: primary
+
+
+  game_search:
+    message: |
+      Выберите вашу роль
+
+    keyboard: 
+      buttons:
+      - - action:
+            type: text
+            label: Игрок
+            payload: 
+              game: player
+          color: primary
+        - action:
+            type: text
+            label: Судья
+            payload: 
+              game: judge
+          color: primary
+      - - action:
+            type: text
+            label: Любая
+            payload: 
+              game: random
+          color: primary
+      - - action:
+            type: text
+            label: Назад
+            payload: 
+              dialog: profile
+          color: primary
+
+  nobattles:
+    message: |
+      У вас нет боев. Вы сможете играть снова завтра после 12:00 по МСК
+
+    keyboard: 
+    buttons:
+      - - action:
+            type: text
+            label: В профиль
+            payload: 
+              dialog: profile
+          color: primary
+
+
+
+  nouser:
+    message: |
+      Данного пользователя нет в базе данных. 
+
+  dialogError:
+    message: |
+      Ой, а такого диалога нет...
+
+  lobbyReady:
+    message: |
+      Лобби в сборе! Нажмите "Готов", чтобы подтвердить свою готовность
+    keyboard: 
+      one_time: true
+      buttons:
+        - - action:
+              type: text
+              label: Готов
+              payload: 
+                game: ready
+            color: primary
+  
+  lobbyActive:
+    message: |
+      Все готовы! Можете начинать игру
+
+  AFKcomp:
+    message: |
+      Один из игроков не был готов, поэтому вам были даны монеты
+
+    keyboard:
+      buttons:
+        - - action:
+              type: text
+              label: В профиль
+              payload: 
+                dialog: profile
+            color: primary
+
+  AFKpun:
+    message: |
+      Вы задерживали игроков, которые хотели поиграть, поэтому у вас отняли часть монет
+
+    keyboard:
+      buttons:
+        - - action:
+              type: text
+              label: В профиль
+              payload: 
+                dialog: profile
+            color: primary

@@ -1,0 +1,4 @@
+pyyaml
+psycopg
+vk_api
+apscheduler

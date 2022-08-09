@@ -1,0 +1,86 @@
+from enum import Enum
+from math import ceil
+
+
+FORMATSTATS = {
+    'balance': ('монету', 'монеты', 'монет'),
+    'scraps': ('обрывок', 'обрывка', 'обрывков'),
+    'experience': ('опыт','опыта', 'опыта'),
+} 
+    
+class botUtils:
+    def formatStats(stats: dict):
+        return [
+            f'{val} {FORMATSTATS[key][0 if val % 10 == 1 else 1 if val % 10 <= 4 and val % 10 >= 2 else 2]}'
+            for key, val in stats.items()
+        ]
+    
+    def formatCards(cardData: dict, cardCount: int = 1):
+        
+        """
+        About repeat or scraps
+        If bool and it's True, then repeat
+        If int, than it's scraps
+        """  
+        return ' '.join(
+            filter(
+                None, [
+                    cardData['raritySymbol'],
+                    cardData['name'],
+                    f'(Ур. {cardData["level"]})' if cardData["level"] > 1 else '',
+                    f'(x{cardCount})' if cardCount > 1 else '',
+                    '(За повторки)' if cardData.get('repeat') else f'({cardData.get("scrapCost")} {"Обрывок" if cardData.get("scrapCost") % 10 == 1 else "Обрывка" if cardData.get("scrapCost") % 10 > 1 and cardData.get("scrapCost") % 10 < 5 else "Обрывков"})' if cardData.get("scrapCost") else ''                   
+                ]
+            )
+        )  
+        
+    def changeStats(data:dict, stats:dict = None, removeStats: dict = None):
+        if stats is None: stats = {}
+        if removeStats is None: removeStats = {}
+        
+        for key, val in stats.items():
+            data[key] += val 
+            
+        for key, val in removeStats.items():
+            data[key].remove(val)
+            
+    def calculateDestroyPrice(params: dict, card: dict, multiplier: int = 0.7):
+        return ceil(
+            botUtils.calculateUpgradePrice(params, card) * multiplier
+        )     
+               
+    def calculateUpgradePrice(params: dict, card:dict):
+        return \
+            params['defaultPrice'] + \
+            params['rarityRatios'][str(card['rarity'])] * \
+            card['level'] ** params['defaultPower']
+                
+    def findUpgradeableCards(cards: list, params: dict, scrapCount:int = 0) -> list:
+        cardData = [
+            (card, cards.count(card), cidx)
+            for cidx,card in enumerate(cards)
+            if card not in cards[cidx + 1:]  
+            and card['level'] < card['maxlevel'] 
+        ]
+        
+        upgradeableCards = []
+        
+        for card, cardCount, cardn in cardData:
+            if (
+                cardCount >= params['repeats'][str(card['rarity'])][card['level']-1]
+            ): 
+                upgradeableCards.append({
+                    "index": cardn,
+                    "repeat": params['repeats'][str(card['rarity'])][card['level']-1]
+                })
+           
+            else:
+                cardCost = botUtils.calculateUpgradePrice(params['cost'], card)
+                
+                if scrapCount >= cardCost:
+                    upgradeableCards.append({
+                        "index": cardn,
+                        "scrapCost": int(cardCost)
+                    })  
+               
+        return upgradeableCards

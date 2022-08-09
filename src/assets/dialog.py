@@ -1,0 +1,55 @@
+from typing import Iterable
+from functions.card_utils import botUtils
+from json import dumps
+
+class dialog:
+    def __init__(self, conf):
+        self.conf = conf
+        
+    def __composePayload(self, keyboard: dict):
+        if not keyboard or not keyboard.get('buttons') and not isinstance(keyboard['buttons'], Iterable): return
+        for y in keyboard['buttons']:
+            for x in y:
+                x['action']['payload'] = dumps(x['action']['payload']).replace('\\','').strip('"')
+        
+        return keyboard
+
+    def getDialogPlain(self, userid: int|str, *, preset:list|str = ['error'], text: str=None, script:str = ''):
+        if not isinstance(preset, (list,tuple)): preset = [preset]
+        keyboard = self.__composePayload(self.conf['dialogs'].get(preset[-1], {}).get('keyboard',script))
+        
+        return {
+            'id': userid,
+            'message': [text] if text is not None else 
+            [self.conf['dialogs'].get(p, {}).get('message', p) for p in preset],
+            'keyboard': dumps(keyboard) if keyboard else None 
+        }
+        
+    def getDialogParsed(self, receiverID: int|str, preset: str|list = ['error'], *, userdata: dict, selectCard: int|list = None):
+        if not isinstance(preset, list): preset = [preset]
+        keyboard = self.__composePayload(self.conf['dialogs'][preset[-1]].get("keyboard"))
+
+        return {
+            "id": receiverID,
+            "message": [
+                self.conf['dialogs']
+                .get(msg, 'error')
+                .get('message', 'DIALOG_PLACEHOLDER')
+                .format(
+                    card = '\n'.join([
+                        botUtils.formatCards(card)
+                        for card in
+                        self.conf.cards.getOwnedCards(
+                            userdata.get("cards", [{'id': -1, 'level':1}]),
+                            select = selectCard
+                            )
+                        ]),
+                    status = self.conf["status"]['names'][userdata.get("status", 0)],
+                    balance = userdata.get("balance", 0),
+                    scraps = userdata.get("scraps", 0),
+                    battles = userdata.get("battles", 0),
+                    packs = userdata.get("packs", [0,0,0,0]),
+                    rank = f'{self.conf.rank.getStatus(userdata)} ({userdata.get("experience", 0)})',
+                ) for msg in preset],
+            "keyboard": dumps(keyboard) if keyboard else None,
+        }
