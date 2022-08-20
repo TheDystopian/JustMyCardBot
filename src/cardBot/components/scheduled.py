@@ -1,18 +1,18 @@
-import logging
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.triggers.cron import CronTrigger
 from time import time
+import components.config as config
 
 
 sched = BlockingScheduler()
 
 class scheduled:
     def event1(self):
-        self.log.info("Event 1 triggered") 
+        self.conf.log.info("Event 1 triggered") 
         
         
         for user in self.DB.get():
-            user['battles'] = self.conf['status']['battles']['count'][user['status']]
+            user['battles'] = self.conf['status']['battles']['amount'][user['status']]
             user["loses"] = user["wins"] = user["judge"] = 0
             
             if user["status"] and user["day"] - time() // 86400 == 1:
@@ -36,7 +36,7 @@ class scheduled:
             self.DB.edit(user)
 
     def event2(self):
-        self.log.info("Event 2 triggered")
+        self.conf.log.info("Event 2 triggered")
         
         def giveRewards(user, whatToGive):
             def balance(amount):
@@ -77,13 +77,12 @@ class scheduled:
 
             self.DB.edit(user)
 
-    def __init__(self, conf):
+    def __init__(self, conf: config = None):
         self.conf = conf
-        logging.basicConfig(format="[SCHED:%(levelname)s] %(message)s")
-        self.log = logging.getLogger(__name__)
-        self.log.setLevel(logging.DEBUG)
         
         self.DB = conf.DBConn()
 
-        sched.add_job(self.event1, CronTrigger.from_crontab('0 12 * * *'))
+        sched.add_job(self.event1, 'cron', hour = 12, minute = 0)
         sched.add_job(self.event2, CronTrigger.from_crontab('0 0 */14 * *'))
+        
+        sched.start()

@@ -1,4 +1,3 @@
-from enum import Enum
 from math import ceil
 
 
@@ -45,11 +44,14 @@ class botUtils:
             data[key].remove(val)
             
     def calculateDestroyPrice(params: dict, card: dict, multiplier: int = 0.7):
-        return ceil(
-            botUtils.calculateUpgradePrice(params, card) * multiplier
-        )     
+        upgradePrice = botUtils.calculateUpgradePrice(params, card)
+        if not upgradePrice: return
+        
+        return ceil(upgradePrice * multiplier)     
                
     def calculateUpgradePrice(params: dict, card:dict):
+        if not params['rarityRatios'].get(str(card['rarity'])): return None
+        
         return \
             params['defaultPrice'] + \
             params['rarityRatios'][str(card['rarity'])] * \
@@ -76,11 +78,15 @@ class botUtils:
            
             else:
                 cardCost = botUtils.calculateUpgradePrice(params['cost'], card)
-                
-                if scrapCount >= cardCost:
-                    upgradeableCards.append({
-                        "index": cardn,
-                        "scrapCost": int(cardCost)
-                    })  
+                if (
+                    cardCost is None
+                    or cardCost > scrapCount
+                ):
+                    continue
+
+                upgradeableCards.append({
+                    "index": cardn,
+                    "scrapCost": int(cardCost)
+                })  
                
         return upgradeableCards

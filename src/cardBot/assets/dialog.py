@@ -25,7 +25,8 @@ class dialog:
             'keyboard': dumps(keyboard) if keyboard else None 
         }
         
-    def getDialogParsed(self, receiverID: int|str, preset: str|list = ['error'], *, userdata: dict, selectCard: int|list = None):
+    def getDialogParsed(self, receiverID: int|str, preset: str|list = ['error'], *, userdata: dict = None, selectCard: int|list = None, **kwargs):
+        if userdata is None: userdata = dict()
         if not isinstance(preset, list): preset = [preset]
         keyboard = self.__composePayload(self.conf['dialogs'][preset[-1]].get("keyboard"))
 
@@ -40,7 +41,7 @@ class dialog:
                         botUtils.formatCards(card)
                         for card in
                         self.conf.cards.getOwnedCards(
-                            userdata.get("cards", [{'id': -1, 'level':1}]),
+                            userdata.get("cards", []),
                             select = selectCard
                             )
                         ]),
@@ -50,6 +51,7 @@ class dialog:
                     battles = userdata.get("battles", 0),
                     packs = userdata.get("packs", [0,0,0,0]),
                     rank = f'{self.conf.rank.getStatus(userdata)} ({userdata.get("experience", 0)})',
+                    key = kwargs,
                 ) for msg in preset],
             "keyboard": dumps(keyboard) if keyboard else None,
         }

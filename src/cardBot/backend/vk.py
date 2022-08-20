@@ -68,10 +68,7 @@ class VK:
                             "reply_id": event.message.fwd_messages[0]["from_id"]
                             if event.message.fwd_messages
                             else event.message.get("reply_message", {}).get("from_id"),
-                            "attachments": [
-                                f'{i["type"]}{i[i["type"]].get("owner_id")}_{i[i["type"]].get("id")}{ ("_" + i[i["type"]].get("access_key")) if i[i["type"]].get("access_key") is not None else ""  }'
-                                for i in event.message.attachments
-                            ],
+                            "attachments": self.generateAttachments(getattr(event.message, 'attachments')),
                         }
 
                     if event.type == bot_longpoll.VkBotEventType.MESSAGE_EVENT:
@@ -103,3 +100,16 @@ class VK:
             ),
             False,
         )
+        
+    def generateAttachments(self, attachments: list[dict]):
+        return [
+            atch['type'] + '_'.join(
+                map(str, filter(None,[
+                    atch[atch["type"]].get("owner_id"),
+                    atch[atch["type"]].get("id"),
+                    atch[atch["type"]].get("access_key"),
+                ])
+            ))
+            for atch in attachments
+            if atch["type"] not in {'sticker'}
+        ]

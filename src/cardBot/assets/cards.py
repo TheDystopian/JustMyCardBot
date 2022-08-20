@@ -76,8 +76,9 @@ class cards:
 
     def getOwnedCards(self, carddata: list, *, select: int|list = None, sort: str = None):
         if not carddata: return []
-        if not isinstance(select, (Iterable, NoneType)): select = [select]
+        if not isinstance(select, (list, tuple)) and select: select = [select]
         selectedCards = carddata if not select else [carddata[i] for i in select]
+        
         returnable = [
             {
                 "name": self.conf['game']['cards']['cards'][i["id"]]["name"],

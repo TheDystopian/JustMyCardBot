@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from random import choice, randrange
 
-from main import config
+import components.config as config
 
 class role(Enum):
     """Player roles"""
@@ -42,11 +42,8 @@ class lobby:
     def getPlayersByRole(self, role: role) -> player:
         return [player for player in self.players if player.role is role]
     
-    def getPlayerIDs(self, *, exclude:int = None, getList = False): 
-        players = [player.id for player in self.players if player.id != exclude]
-        
-        if getList: return players
-        return ','.join(map(str, players))
+    def getPlayerIDs(self, *, exclude: int = None): 
+        return [player.id for player in self.players if player.id != exclude]
     
     def getPlayerByID(self, id: int) -> player:
         return next((
@@ -106,7 +103,7 @@ class game:
             
     def readyLobby(self, lobby: lobby):
         self.conf.vk.send(
-        self.conf.dialogs.getDialogPlain(userid=lobby.getPlayerIDs(), preset = 'lobbyReady')
+        self.conf.dialogs.getDialogPlain(userid=','.join(map(str, lobby.getPlayerIDs())), preset = 'lobbyReady')
         ) 
 
         lobby.status = lobby_status.full
@@ -131,6 +128,8 @@ class game:
             if lobby is None: return
         
         player = next((player for player in lobby.players if id == player.id), None)
+        if player is None: return
+        
         player.ready = True
         if all(player.ready for player in lobby.players):
             self.allReady(lobby)
@@ -139,7 +138,7 @@ class game:
         lobby.timeoutTask.cancel()
         
         self.conf.vk.send(
-        self.conf.dialogs.getDialogPlain(userid=lobby.getPlayerIDs(), preset = 'lobbyActive')
+        self.conf.dialogs.getDialogPlain(userid=','.join(map(str, lobby.getPlayerIDs())), preset = 'lobbyActive')
         )
 
         lobby.lobbyStatus = lobby_status.active
@@ -161,8 +160,7 @@ class game:
     def findLobby(self, id: int):
         return next((
             lobby for lobby in self.lobbies 
-            if id in 
-            [player.id for player in lobby.players]
+            if id in lobby.getPlayerIDs()
         ), None)
 
 class gameFunctions(generalFunctions):
@@ -191,7 +189,7 @@ class gameFunctions(generalFunctions):
     def flip(self, *_):
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
-                self.lobby.getPlayerIDs(),
+                ','.join(map(str, self.lobby.getPlayerIDs())),
                 preset = choice(["firstPlayer", "secondPlayer"])
             )
         )
@@ -205,14 +203,14 @@ class gameFunctions(generalFunctions):
         
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
-                self.lobby.getPlayerIDs(),
+                ','.join(map(str, lobby.getPlayerIDs())),
                 text = 'Успешно' 
                     if randrange(1, 101) <= int(chance[0])
                     else 'Не успешно'
             )
         )
         
-    def win(self, playerIDx, data):
+    def win(self, playerIDx, data):        
         if (
             self.lobby.lobbyStatus is not lobby_status.active 
             or self.lobby.getPlayerByID(data['db']['id']).role is not role.judge
@@ -229,7 +227,7 @@ class gameFunctions(generalFunctions):
                 
                 botUtils.changeStats(
                     player,
-                    self.conf['status']['battles']['win'][player['status']]
+                    self.conf['status']['battles']['win'][player['status']] | {'wins': 1}
                 )
                 
                 formatted = botUtils.formatStats(self.conf['status']['battles']['win'][player['status']])
@@ -238,9 +236,28 @@ class gameFunctions(generalFunctions):
                     self.conf.dialogs.getDialogPlain(
                         player['id'],
                         text = f'Вы выиграли. Вы получаете {formatted[0]} и {formatted[1]}'
+                    )  
+                )
+                
+                
+                if not player['wins'] % self.conf['status']['streak']['count']['win'][player['status']]:
+                    formatted = botUtils.formatStats(
+                        self.conf['status']['streak']['reward']['win'][player['status']]
+                    )
+                    botUtils.changeStats(
+                        player,
+                        self.conf['status']['streak']['reward']['win'][player['status']] 
                     )
                     
-                )
+                    self.conf.vk.send(
+                        self.conf.dialogs.getDialogPlain(
+                            player['id'],
+                            text = f'Вы получаете {formatted[0]} за ваш винстрик'
+                            
+                        )  
+                    )
+                
+                
                 self.db.edit(player)
                 continue
         
@@ -248,7 +265,7 @@ class gameFunctions(generalFunctions):
             
             botUtils.changeStats(
                 player,
-                self.conf['status']['battles']['lose'][player['status']]
+                self.conf['status']['battles']['lose'][player['status']] | {'loses': 1}
             )
             
             formatted = botUtils.formatStats(self.conf['status']['battles']['lose'][player['status']])
@@ -259,20 +276,58 @@ class gameFunctions(generalFunctions):
                     text = f'Вы проиграли. Вы получаете {formatted[0]}'
                 )
             )
+            
+            if not player['loses'] % self.conf['status']['streak']['count']['lose'][player['status']]:
+                formatted = botUtils.formatStats(
+                    self.conf['status']['streak']['reward']['lose'][player['status']]
+                )
+                botUtils.changeStats(
+                    player,
+                    self.conf['status']['streak']['reward']['lose'][player['status']] 
+                )
+                
+                self.conf.vk.send(
+                    self.conf.dialogs.getDialogPlain(
+                        player['id'],
+                        text = f'Вы получаете {formatted[0]} за ваш лузстрик'
+                        
+                    )  
+                )
+            
+            
             self.db.edit(player)
         
         self.editDB = True
         botUtils.changeStats(
             data['db'],
-            self.conf['status']['battles']['judge'][player['status']]
+            self.conf['status']['battles']['judge'][data['db']['status']] | {'judge': 1}
         )
         
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
                 data['vk']['user'],
-                text = f"Вы получаете {botUtils.formatStats(self.conf['status']['battles']['judge'][player['status']])[0]} за судейство"
+                text = f"Вы получаете {botUtils.formatStats(self.conf['status']['battles']['judge'][data['db']['status']])[0]} за судейство"
             )
         )
+        
+        if not data['db']['judge'] % self.conf['status']['streak']['count']['judge'][data['db']['status']]:
+            formatted = botUtils.formatStats(
+                self.conf['status']['streak']['reward']['judge'][data['db']['status']]
+            )
+            
+            botUtils.changeStats(
+                data['db'],
+                self.conf['status']['streak']['reward']['judge'][data['db']['status']] 
+            )
+            
+            self.conf.vk.send(
+                self.conf.dialogs.getDialogPlain(
+                    data['db']['id'],
+                    text = f'Вы получаете {formatted[0]} за активное судейство'
+                    
+                )  
+            )
+        
         
         self._game.lobbies.remove(self.lobby)
         
@@ -283,14 +338,25 @@ class gameFunctions(generalFunctions):
         self._game = game
         
         if None in payload:
+            playerID = data["db"]["id"]
+            if playerID != data['vk']['peer_id']: return
+            playerList = [player.id for player in lobby.getPlayersByRole(role.player)]
+            
+            try:
+                playerType = f'Игрок {playerList.index(data["db"]["id"]) + 1}'
+            except ValueError:
+                playerType = 'Судья'
+            
+            recepients = ','.join(map(str, lobby.getPlayerIDs(exclude = playerID)))
+            if not recepients: return
+            
+            
             self.conf.vk.send(
                 self.conf.dialogs.getDialogPlain(
-                    self.lobby.getPlayerIDs(exclude = data['vk']['user']),
-                    text = f"""{'Игрок ' + 
-                        str([player.id for player in lobby.getPlayersByRole(role.player)].index(data['db']['id']) + 1)
-                        if data['db']['id'] in [player.id for player in lobby.getPlayersByRole(role.player)] else 'Судья'    
-                    }:\n{data['vk']['text']}"""
-                   
+                    recepients,
+                    text = f'''
+                    {playerType}:\n{data['vk']['text']}
+                    '''
                 ),
                 attachments=data['vk']['attachments'],
                 sendSeparately=False

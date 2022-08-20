@@ -133,7 +133,7 @@ class core:
             return
  
         func = generalFunctions(self.config, data, payload, self.db, self.game) \
-            if not state['lobby'] else gameFunctions(self.config, state['lobby'], data, payload, self.db, self.game)
+            if not state['lobby'] or state['isChat']  else gameFunctions(self.config, state['lobby'], data, payload, self.db, self.game)
             
         if func.editDB:
             self.db.edit(data["db"])

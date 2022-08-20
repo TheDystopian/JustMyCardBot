@@ -3,13 +3,13 @@ from random import choice, randrange
 from typing import Iterable
 from backend.db import DB
 from functions.card_utils import botUtils
-import functions.game
-from main import config
+import functions.game as funcgame
+import components.config as config
 
 
 class UserError(Exception):
     """
-    Raised when player does comply with requirements to execute function
+    Raised when player does not comply with requirements to execute function
     """
     pass
 
@@ -17,8 +17,13 @@ class UserError(Exception):
 class generalFunctions:
     def dialog(self, dialog, data):
         self.conf.vk.send(
-                self.conf.dialogs.getDialogParsed(data['vk']['peer_id'], dialog, userdata = data['db'])
+            self.conf.dialogs.getDialogParsed(
+                data['vk']['peer_id'], 
+                dialog, 
+                userdata = data['db'],
+                packs = [i.get("price") for i in self.conf['game']["packs"]]
             )
+        )
     
     def flip(self, _, data):
         self.conf.vk.send(
@@ -174,7 +179,7 @@ class generalFunctions:
                 else self.conf['status']["defaultDays"]
             )
             
-            user['premium'] = int(time() // 86400 + statusDays + 1)
+            user['day'] = int(time() // 86400 + statusDays + 1)
             
             self.conf.vk.send(
                 self.conf.dialogs.getDialogPlain(
@@ -185,6 +190,8 @@ class generalFunctions:
                     '''
                 )
             )
+            self.db.edit(user)
+            return
 
         if not isinstance(thing,dict):
             raise UserError('cantError')
@@ -252,7 +259,7 @@ class generalFunctions:
 
             foundCardID = next((
                 cid
-                for cid, cdt in enumerate(self.conf.cards.allCards())
+                for cid, cdt in enumerate(self.conf['game']['cards']['cards'])
                 if foundCardLevel in range(len('photo'))
                 and cdt['name'].lower().find(" ".join(thing['cards'])) != -1
             ),
@@ -266,7 +273,13 @@ class generalFunctions:
                 "id": foundCardID,
                 'level': foundCardLevel
             })    
-                
+        
+        elif (
+            thing.get("rank")
+            and thing['rank'][-1].lstrip('-').isdecimal()   
+        ):
+            user['experience'] += int(thing['rank'][-1])
+           
         else: return
         
         self.db.edit(user)
@@ -457,8 +470,11 @@ class generalFunctions:
         cardPrice = botUtils.calculateDestroyPrice(
             self.conf['game']['cards']['upgrade']['cost'],
             cardData,
-            self.conf['game']['cards']['break'].get('destroyMultiplier', 0.7)
+            self.conf['game']['cards']['break'].get('multiplier', 0.7)
         )
+        if not cardPrice:
+            raise UserError('noDestoyableCards')
+        
         
         self.editDB = True
         data['db']['cards'].pop(cardIndex)
@@ -481,6 +497,8 @@ class generalFunctions:
             self.conf['game']['cards']['upgrade'],
             data['db']['scraps']        
         )]
+        
+        
         
         if not card:
             if not upgradeableCards:
@@ -543,20 +561,106 @@ class generalFunctions:
                 data['db']['scraps'] -= card['scrapCost'] 
 
     def game(self, _role, data):
+        if 'stop' in _role:
+            self.payload.append({'dialog': 'profile'})
+            return
+        
         if "random" in _role:
             _role = choice(('player', 'judge'))
+            
+        if data['db']['battles'] <= 0 and _role == 'player': 
+            raise UserError('nobattles')
         
-        self._game.addToLobby(data['db']['id'],functions.game.role[_role])
+        self.conf.vk.send(
+            self.conf.dialogs.getDialogParsed(
+                data['vk']['user'],
+                "randomRole",
+                role = getattr(funcgame.role, _role).title
+            )
+        )
+        
+        self._game.addToLobby(data['db']['id'], getattr(funcgame.role, _role))
 
-    def __init__(self,conf: config, data: dict = None, payload: list[dict] = None, db: DB = None, _game = None):
+    def trade(self, tradeData, data):
+        if (
+            not tradeData
+        ):
+            raise UserError('cantTrade')
+        
+        if 'balance' in tradeData:
+            try:
+                amount = int(tradeData['balance'][-1])
+                if (
+                    amount < 0
+                    or data['db']['balance'] < amount
+                ):
+                    raise ValueError 
+            except ValueError:
+                raise UserError('cantTrade')
+            
+
+            roundBal = amount - (amount % self.conf['game']['trade']['toScraps'])
+            addScraps = roundBal // self.conf['game']['trade']['toScraps']
+            
+            self.editDB = True
+            data['db']['balance'] -= roundBal
+            data['db']['scraps'] += addScraps
+            
+            
+            self.conf.vk.send(
+                self.conf.dialogs.getDialogParsed(
+                    data['vk']['peer_id'],
+                    'tradeScraps',
+                    removeBal = roundBal,
+                    addScraps = addScraps
+                )
+            )
+            
+        elif 'scraps' in tradeData:
+            try:
+                amount = int(tradeData['scraps'][-1])
+                if (
+                    amount < 0
+                    or data['db']['scraps'] < amount
+                ):
+                    raise ValueError 
+            except ValueError:
+                raise UserError('cantTrade')
+
+            self.editDB = True
+            addBalance = amount * self.conf['game']['trade']['toBalance']
+            data['db']['balance'] += addBalance
+            data['db']['scraps'] -= amount
+            
+            self.conf.vk.send(
+                self.conf.dialogs.getDialogParsed(
+                    data['vk']['peer_id'],
+                    'tradeBalance',
+                    addBal = addBalance,
+                    removeScraps = amount
+                )
+            )
+            
+        else:
+            raise UserError('cantTrade')
+        
+        
+
+
+    def __init__(self, conf: config, data: dict = None, payload: list[dict] = None, db: DB = None, _game = None):
         self.conf = conf
         self.db = db
         self._game = _game
         self.editDB = False
         
-        if not isinstance(payload, Iterable): return 
+        self.payload = payload
         
-        for func in payload:
+        
+        if not isinstance(self.payload, Iterable): return 
+        
+        for func in self.payload:
+            if not func: continue
+            
             for key, val in func.items():
                 method = getattr(self, key, None)
                 if method is None: continue

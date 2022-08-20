@@ -1,0 +1,18 @@
+DB:
+  dbname: <DB NAME>
+  user: <DB USER>
+  passwd: <DB PASSWORD>
+  host: <DB IP ADDRESS>
+  port: <DB PORT>
+
+VK:
+  key: <VK API KEY>
+  groups:
+    devs:
+      - DEV 1
+      - DEV 2
+      - DEV ...
+    admins:
+      - ADMIN 1
+      - ADMIN 2
+      - ADMIN ...
