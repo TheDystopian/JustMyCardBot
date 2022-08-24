@@ -369,7 +369,7 @@ class gameFunctions(generalFunctions):
             )
  
     def __chat(self, data):
-        if not data['vk']['text']: return
+        if not data['vk']['text'] and not data['vk']['attachments']: return
         
         recepients = ','.join(map(str, self.lobby.getPlayerIDs(exclude = data['db']['id'])))
         if not recepients: return
