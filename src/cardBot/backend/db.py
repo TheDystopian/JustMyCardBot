@@ -53,7 +53,7 @@ class DB:
                 (user,) if filterCol and user else ()
             ).fetchall()
             
-            if data is None: return None
+            if not data: return None
 
             data = [
                 self.__composeDict(
