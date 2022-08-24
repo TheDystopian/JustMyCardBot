@@ -7,8 +7,6 @@ import components.config as config
 
 class Bot:
     def __init__(self, conf: config.config):
-        logging.basicConfig(format="[BOT:%(levelname)s] %(message)s")
-  
         self.conf = conf
 
         self.db = conf.DBConn()

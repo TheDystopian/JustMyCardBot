@@ -30,6 +30,7 @@ class VK:
                         "random_id": get_random_id(),
                         "peer_ids": sendable.get("id",''),
                         "message": sendable.get("message"),
+                        "disable_mentions": True,
                     },
                 )
                 for atch in attachments
@@ -47,6 +48,7 @@ class VK:
                         "random_id": get_random_id(),
                         "keyboard": sendable.get("keyboard"),
                         "peer_ids": sendable.get("id"),
+                        "disable_mentions": True,
                     },
                 )
 
