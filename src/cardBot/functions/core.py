@@ -132,8 +132,22 @@ class core:
             self.config.vk.send(self.config.dialogs.getDialogPlain(data['vk']['user'], preset = ["greeting"]))
             return
  
-        func = generalFunctions(self.config, data, payload, self.db, self.game) \
-            if not state['lobby'] or state['isChat']  else gameFunctions(self.config, state['lobby'], data, payload, self.db, self.game)
+ 
+        try:
+            func = generalFunctions(self.config, data, payload, self.db, self.game) \
+                if not state['lobby'] or state['isChat']  else gameFunctions(self.config, state['lobby'], data, payload, self.db, self.game)
+        
+            if func.editDB:
+                self.db.edit(data["db"])
+        
+        except UserError as preset:
+            self.config.vk.send(
+                self.config.dialogs.getDialogPlain(
+                    data['vk']['peer_id'],
+                    preset=preset.args
+                )
+            )        
+                
+                
             
-        if func.editDB:
-            self.db.edit(data["db"])
+

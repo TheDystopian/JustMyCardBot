@@ -12,24 +12,16 @@ class scheduled:
         
         
         for user in self.DB.get():
-            user['battles'] = self.conf['status']['battles']['amount'][user['status']]
+            user['battles'] = self.conf['status']['status'][user['status']]['battles']['count']
             user["loses"] = user["wins"] = user["judge"] = 0
-            
-            if user["status"] and user["day"] - time() // 86400 == 1:
-                self.conf.vk.send(
-                    {
-                        "message": f'Ваш статус {self.conf["status"]["names"][user["status"]]} заканчивается. Для пополнения напишите в администрацию',
-                        "id": user["id"],
-                    }
-                )
-            
             
             if user["status"] and user["day"] - time() // 86400 <= 0:
                 self.conf.vk.send(
-                    {
-                        "message": f'Ваш статус {self.conf["status"]["names"][user["status"]]} истек. Для пополнения напишите в администрацию',
-                        "id": user["id"],
-                    }
+                    self.conf.dialogs.getDialogParsed(
+                        user["id"],
+                        'statusExpire',
+                        userdata = user
+                    )
                 )
                 user["status"] = 0
                 
@@ -83,6 +75,6 @@ class scheduled:
         self.DB = conf.DBConn()
 
         sched.add_job(self.event1, 'cron', hour = 12, minute = 0)
-        sched.add_job(self.event2, CronTrigger.from_crontab('0 0 */14 * *'))
+        sched.add_job(self.event2, CronTrigger.from_crontab('0 12 1,18 * *'))
         
         sched.start()

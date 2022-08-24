@@ -1,13 +1,16 @@
-from threading import Timer
+from threading import Thread
 from backend.db import DB
 from functions.card_utils import botUtils
 
-from functions.functions import generalFunctions
+from functions.functions import generalFunctions, UserError
 from dataclasses import dataclass, field
 from enum import Enum
 from random import choice, randrange
 
 import components.config as config
+from time import time
+
+
 
 class role(Enum):
     """Player roles"""
@@ -21,8 +24,7 @@ class role(Enum):
 class lobby_status(Enum):
     """Lobby statuses"""
     active = ("Идет игра")
-    full = ("Полное. Ожидание готовности")
-    free = ("Есть места")
+    free = ("Ожидание")
 
     def __init__(self, title):
         self.title = title
@@ -31,15 +33,16 @@ class lobby_status(Enum):
 class player:
     id: int
     role: role 
-    ready: bool = False 
+    lastActivity: int = None
       
 @dataclass
 class lobby:
-    timeoutTask: Timer = None
+    timeoutTask: Thread = None
     players: list[player] = field(default_factory=lambda:[])
     lobbyStatus: lobby_status = lobby_status.free
+    lobbyStorage: list = None
     
-    def getPlayersByRole(self, role: role) -> player:
+    def getPlayersByRole(self, role: role) -> list[player]:
         return [player for player in self.players if player.role is role]
     
     def getPlayerIDs(self, *, exclude: int = None): 
@@ -52,30 +55,47 @@ class lobby:
             if player.id == id
         ), None)
     
-    def timeout(self, config: config, lobbyStorage: list):
-        db = config.DBConn()
+    def timeout(self, conf: config):
+        # Operate
+        
+        while True:
+            if getattr(self, 'kill', False): return
+            
+            if any(
+                time() - player.lastActivity > conf['lobby'].get('timeout',60)
+                for player in self.players
+            ):
+                break
+
+
+        db = conf.DBConn()
     
         for player in self.players:
             playerData = db.get(player.id)
             
-            if player.ready:
-               config.vk.send(config.dialogs.getDialogPlain(userid=player.id, preset = 'AFKcomp'))
-               playerData['balance'] += config['lobby']['AFK']['compensation']
-               if player.role == role.player:
-                   playerData['battles'] += 1
+            if time() - player.lastActivity > conf['lobby'].get('timeout',60):
+                conf.vk.send(conf.dialogs.getDialogPlain(userid=player.id, preset = 'AFKpun'))
+                playerData['balance'] -= conf['lobby']['AFK']['punish']
+                if player.role is role.player:
+                    playerData['battles'] -= 1
             else:
-                config.vk.send(config.dialogs.getDialogPlain(userid=player.id, preset = 'AFKpun'))
-                playerData['balance'] -= config['lobby']['AFK']['punish']
-                
+               conf.vk.send(conf.dialogs.getDialogPlain(userid=player.id, preset = 'AFKcomp'))
+               playerData['balance'] += conf['lobby']['AFK']['compensation']
+
             db.edit(playerData)
-                
-        lobbyStorage.remove(self) 
+            
+        self.killLobby()    
+    
+    def killLobby(self):
+        self.kill = True
+        self.lobbyStorage.remove(self)
      
 class game:
+    lobbies: list[lobby] = []
+    
     def __init__(self, conf: config, db: DB):
         self.conf = conf
         self.db = db
-        self.lobbies: list[lobby] = []
     
     def addToLobby(self, id: int, role: role):
         freeLobby = next(
@@ -93,7 +113,8 @@ class game:
         if freeLobby is None:
             self.lobbies.append(
                 lobby(
-                    players = [player(id = id, role = role)], 
+                    players = [player(id = id, role = role)],
+                    lobbyStorage = self.lobbies
                 ))
             return
         
@@ -103,45 +124,24 @@ class game:
             
     def readyLobby(self, lobby: lobby):
         self.conf.vk.send(
-        self.conf.dialogs.getDialogPlain(userid=','.join(map(str, lobby.getPlayerIDs())), preset = 'lobbyReady')
-        ) 
-
-        lobby.status = lobby_status.full
-        for player in [player for player in lobby.players if player.role is not role.judge]:
-            plr = self.db.get(player.id)
-            plr['battles'] -= 1
-            self.db.edit(plr)
-        
-        lobby.timeoutTask = Timer(
-            self.conf['lobby'].get('timeout',60), 
-            lobby.timeout,
-            args = (
-                self.conf,
-                self.lobbies
+            self.conf.dialogs.getDialogPlain(
+                userid=','.join(map(str, lobby.getPlayerIDs())),
+                preset = 'lobbyReady'
             )
-        )
-        lobby.timeoutTask.start()
-
-    def setReadiness(self, id, *, lobby: lobby = None):
-        if lobby is None:
-            lobby = self.findLobby(id)
-            if lobby is None: return
-        
-        player = next((player for player in lobby.players if id == player.id), None)
-        if player is None: return
-        
-        player.ready = True
-        if all(player.ready for player in lobby.players):
-            self.allReady(lobby)
-        
-    def allReady(self, lobby: lobby):
-        lobby.timeoutTask.cancel()
-        
-        self.conf.vk.send(
-        self.conf.dialogs.getDialogPlain(userid=','.join(map(str, lobby.getPlayerIDs())), preset = 'lobbyActive')
         )
 
         lobby.lobbyStatus = lobby_status.active
+        for player in lobby.players:
+            player.lastActivity = time()
+        
+        lobby.timeoutTask = Thread(
+            target = lobby.timeout,
+            args = (
+                self.conf,
+            ),
+            daemon = True
+        )
+        lobby.timeoutTask.start()
     
     def deletePlayer(self, id: int, *, lobby: lobby = None):
         if lobby is None:
@@ -164,37 +164,71 @@ class game:
         ), None)
 
 class gameFunctions(generalFunctions):
-    def game(self, role, data):
+    def game(self, role):
         if (
             self.lobby.lobbyStatus is not lobby_status.free
         ): return
         
-        if "ready" in role:
-            self._game.setReadiness(
-                data['db']['id'],
-                lobby = self.lobby
-            )
-        
         elif "stop" in role:
-            self._game.deletePlayer(data['db']['id'], lobby = self.lobby)
+            self._game.deletePlayer(self.data['db']['id'], lobby = self.lobby)
             
             self.conf.vk.send(
                 self.conf.dialogs.getDialogPlain(
-                    data['vk']['user'],
+                    self.data['vk']['user'],
                     preset = 'stopLobbySearch'
 
                 )
             )
 
-    def flip(self, *_):
+    def ready(self, _):
+        playerType = self.__getplayer(
+            self.lobby.getPlayersByRole(role.player)
+        )
+
+        self.conf.vk.send(
+            self.conf.dialogs.getDialogPlain(
+                ','.join(map(str, self.lobby.getPlayerIDs(exclude = self.data['db']['id']))),
+                text = '{} {}'.format(
+                    playerType,
+                    'готов'
+                )
+            )
+        )
+
+    def actions(self, _):
+        self.conf.vk.send(
+            self.conf.dialogs.getDialogPlain(
+                self.data['vk']['user'],
+                preset = f'{self.player.role.id}Actions'
+            )
+        )
+
+    def profile(self, _):
+        if (
+            self.data['vk']['peer_id'] != self.data['vk']['user']
+            or self.data['vk']['reply_id']
+        ):
+            return super().profile(None)
+
+        self.conf.vk.send(
+            self.conf.dialogs.getDialogParsed(
+                self.data['vk']['user'] if self.data['vk']['reply_id'] != self.data['vk']['user'] and self.data['vk']['reply_id'] is not None else self.data['vk']['peer_id'],
+                'profile_game',
+                userdata = self.data['db'],
+                role = self.player.role.title,
+                lobbyStatus = self.lobby.lobbyStatus.title
+            )
+        )
+
+    def flip(self, _):
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
                 ','.join(map(str, self.lobby.getPlayerIDs())),
                 preset = choice(["firstPlayer", "secondPlayer"])
             )
         )
-    
-    def chance(self, chance, _):
+
+    def chance(self, chance):
         if not chance: 
             raise NotImplementedError('cantError')
         
@@ -209,173 +243,171 @@ class gameFunctions(generalFunctions):
                     else 'Не успешно'
             )
         )
+
+    def showCards(self, cards):
+        if (
+            not cards
+            or not isinstance(cards, list)
+            or self.lobby.lobbyStatus is not lobby_status.active
+        ):
+            return super().showCards(cards)
         
-    def win(self, playerIDx, data):        
+        recepients = ','.join(map(str, self.lobby.getPlayerIDs(exclude = self.data['db']['id'])))
+        if not recepients: 
+            return super().showCards(cards)
+        
+        
+        try:
+            cardLevel = int(cards[-1])
+            cards = cards[:-1]
+        except ValueError:
+            cardLevel = 1
+        
+        cardData = self.conf.cards.getOwnedCards(self.data['db']['cards'])
+        
+        cardData = [
+            card
+            for card in cardData
+            if card['name'].lower().find(' '.join(cards)) != -1
+            and card['level'] == cardLevel
+        ]
+        if not cardData:
+            raise UserError('noCards')
+    
+        cardData = [
+            card
+            for cID, card in enumerate(cardData)
+            if card not in cardData[cID+1:]
+        ]
+        
+        if len(cardData) != 1:
+            raise UserError('undefinedCard')
+
+        cardData = cardData[-1]
+        
+        self.conf.vk.send(
+            self.conf.dialogs.getDialogPlain(
+                self.data['vk']['peer_id'],
+                text = f'Вы походили картой {botUtils.formatCards(cardData, raritySymbol= False)}'
+            ),
+            attachments = cardData['attachment'],
+            sendSeparately = False
+        )
+        
+        playerType = self.__getplayer(self.lobby.getPlayersByRole(role.player))
+        
+
+        self.conf.vk.send(
+            self.conf.dialogs.getDialogPlain(
+                recepients,
+                text = f'{playerType} походил картой {botUtils.formatCards(cardData, raritySymbol= False)}'
+            ),
+            attachments = cardData['attachment'],
+            sendSeparately = False
+        )
+        
+    def win(self, playerIDx):
         if (
             self.lobby.lobbyStatus is not lobby_status.active 
-            or self.lobby.getPlayerByID(data['db']['id']).role is not role.judge
+            or self.player.role is not role.judge
             or not playerIDx
             or not playerIDx[-1].isdecimal()  
         ): return
         
         playerWinner = int(playerIDx[-1])-1
         players = [self.db.get(i.id) for i in self.lobby.getPlayersByRole(role.player)]
+        self.lobby.killLobby()
 
-        for playeridx, player in enumerate(players):            
-            if playeridx == playerWinner:
-                self.conf.rank.win(player)
-                
-                botUtils.changeStats(
-                    player,
-                    self.conf['status']['battles']['win'][player['status']] | {'wins': 1}
-                )
-                
-                formatted = botUtils.formatStats(self.conf['status']['battles']['win'][player['status']])
-                
-                self.conf.vk.send(
-                    self.conf.dialogs.getDialogPlain(
-                        player['id'],
-                        text = f'Вы выиграли. Вы получаете {formatted[0]} и {formatted[1]}'
-                    )  
-                )
-                
-                
-                if not player['wins'] % self.conf['status']['streak']['count']['win'][player['status']]:
-                    formatted = botUtils.formatStats(
-                        self.conf['status']['streak']['reward']['win'][player['status']]
-                    )
-                    botUtils.changeStats(
-                        player,
-                        self.conf['status']['streak']['reward']['win'][player['status']] 
-                    )
-                    
-                    self.conf.vk.send(
-                        self.conf.dialogs.getDialogPlain(
-                            player['id'],
-                            text = f'Вы получаете {formatted[0]} за ваш винстрик'
-                            
-                        )  
-                    )
-                
-                
-                self.db.edit(player)
-                continue
-        
-            self.conf.rank.lose(player)
-            
-            botUtils.changeStats(
+        for playeridx, player in enumerate(players):
+            player['battles'] -= 1          
+
+            self.__giveStat(
                 player,
-                self.conf['status']['battles']['lose'][player['status']] | {'loses': 1}
+                'win' if playeridx == playerWinner else 'lose'
             )
-            
-            formatted = botUtils.formatStats(self.conf['status']['battles']['lose'][player['status']])
-            
-            self.conf.vk.send(
-                self.conf.dialogs.getDialogPlain(
-                    player['id'],
-                    text = f'Вы проиграли. Вы получаете {formatted[0]}'
-                )
-            )
-            
-            if not player['loses'] % self.conf['status']['streak']['count']['lose'][player['status']]:
-                formatted = botUtils.formatStats(
-                    self.conf['status']['streak']['reward']['lose'][player['status']]
-                )
-                botUtils.changeStats(
-                    player,
-                    self.conf['status']['streak']['reward']['lose'][player['status']] 
-                )
-                
-                self.conf.vk.send(
-                    self.conf.dialogs.getDialogPlain(
-                        player['id'],
-                        text = f'Вы получаете {formatted[0]} за ваш лузстрик'
-                        
-                    )  
-                )
-            
-            
+
             self.db.edit(player)
         
         self.editDB = True
+        self.__giveStat(
+            self.data['db'],
+            'judge'   
+        )
+ 
+    def __giveStat(self, player, status):
+        rank = getattr(self.conf.rank, status, None)
+        if rank:
+            rank(player)
+        
         botUtils.changeStats(
-            data['db'],
-            self.conf['status']['battles']['judge'][data['db']['status']] | {'judge': 1}
+            player,
+            self.conf['status']['status'][player['status']]['battles'][status] | {status: 1}
         )
-        
+
         self.conf.vk.send(
-            self.conf.dialogs.getDialogPlain(
-                data['vk']['user'],
-                text = f"Вы получаете {botUtils.formatStats(self.conf['status']['battles']['judge'][data['db']['status']])[0]} за судейство"
-            )
+            self.conf.dialogs.getDialogParsed(
+                player['id'],
+                preset = f'{status}Template',
+                formatStats= botUtils.formatStats(self.conf['status']['status'][player['status']]['battles'][status])
+            )  
         )
-        
-        if not data['db']['judge'] % self.conf['status']['streak']['count']['judge'][data['db']['status']]:
-            formatted = botUtils.formatStats(
-                self.conf['status']['streak']['reward']['judge'][data['db']['status']]
-            )
-            
+
+        if not player[status] % self.conf['status']['status'][player['status']]['streak'][status]['count']:
             botUtils.changeStats(
-                data['db'],
-                self.conf['status']['streak']['reward']['judge'][data['db']['status']] 
+                player,
+                self.conf['status']['status'][player['status']]['streak'][status]['reward']
             )
             
             self.conf.vk.send(
-                self.conf.dialogs.getDialogPlain(
-                    data['db']['id'],
-                    text = f'Вы получаете {formatted[0]} за активное судейство'
-                    
+                self.conf.dialogs.getDialogParsed(
+                    player['id'],
+                    preset = f'{status}TemplateStreak',
+                    formatStats = botUtils.formatStats(
+                        self.conf['status']['status'][player['status']]['streak'][status]['reward']
+                    )
                 )  
             )
+ 
+    def __chat(self, data):
+        if not data['vk']['text']: return
         
-        
-        self._game.lobbies.remove(self.lobby)
-        
-    def __init__(self,conf: config, lobby:lobby = None, data = None, payload = None, db = None, game: game = None):
-        super().__init__(conf, db = db)
-        
+        recepients = ','.join(map(str, self.lobby.getPlayerIDs(exclude = data['db']['id'])))
+        if not recepients: return
+
+        playerType = self.__getplayer(self.lobby.getPlayersByRole(role.player))
+
+        self.conf.vk.send(
+            self.conf.dialogs.getDialogPlain(
+                recepients,
+                text = '{}:\n{}'.format(
+                    playerType,
+                    data['vk']['text']
+                )
+            ),
+            attachments=data['vk']['attachments'],
+            sendSeparately=False
+        )
+       
+    def __init__(self, conf: config, lobby:lobby = None, data = None, payload = None, db = None, game: game = None):
         self.lobby = lobby
-        self._game = game
+        self.conf = conf
+        self.editDB = False
+        self.player = lobby.getPlayerByID(data['db']['id'])
         
-        if None in payload:
-            playerID = data["db"]["id"]
-            if playerID != data['vk']['peer_id']: return
-            playerList = [player.id for player in lobby.getPlayersByRole(role.player)]
-            
-            try:
-                playerType = f'Игрок {playerList.index(data["db"]["id"]) + 1}'
-            except ValueError:
-                playerType = 'Судья'
-            
-            recepients = ','.join(map(str, lobby.getPlayerIDs(exclude = playerID)))
-            if not recepients: return
-            
-            
-            self.conf.vk.send(
-                self.conf.dialogs.getDialogPlain(
-                    recepients,
-                    text = f'''
-                    {playerType}:\n{data['vk']['text']}
-                    '''
-                ),
-                attachments=data['vk']['attachments'],
-                sendSeparately=False
-            )
-            return
-        if not isinstance(payload, list): return 
+        if self.lobby.lobbyStatus is not lobby_status.free:
+            self.player.lastActivity = time()
+
+        if (
+            None in payload
+            or 'ready' in payload
+            or not isinstance(payload, list)
+        ):
+            return self.__chat(data)
         
-        for func in payload:
-            for key, val in func.items():
-                method = getattr(self, key, None)
-                if method is None: continue
-                
-                
-                try:
-                    method(val, data)
-                except Exception as e:
-                    self.conf.vk.send(
-                        self.conf.dialogs.getDialogPlain(
-                            data['vk']['peer_id'],
-                            preset=e.args
-                        )
-                    )
+        super().__init__(conf, data, payload, db, game)
+        
+    def __getplayer(self, playerList):
+        try:
+            return f'{role.player.title} {playerList.index(self.player) + 1}'
+        except ValueError:
+            return role.judge.title

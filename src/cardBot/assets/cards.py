@@ -76,8 +76,8 @@ class cards:
 
     def getOwnedCards(self, carddata: list, *, select: int|list = None, sort: str = None):
         if not carddata: return []
-        if not isinstance(select, (list, tuple)) and select: select = [select]
-        selectedCards = carddata if not select else [carddata[i] for i in select]
+        if not isinstance(select, (list, tuple)) and select is not None: select = [select]
+        carddata = carddata if not select else [carddata[i] for i in select]
         
         returnable = [
             {
@@ -91,7 +91,7 @@ class cards:
                     ''
                 )
             }
-            for i in selectedCards
+            for i in carddata
         ]
         return (
             returnable

@@ -1,6 +1,6 @@
 import logging
 
-from os.path import dirname, join
+from os.path import dirname, join, exists
 from yaml import safe_load
 from os import getenv
 
@@ -14,25 +14,19 @@ class config:
         
         self.log.info('Loading config...')
         
-        conf = join(dirname(__file__), conf)
+        self.confLocation = join(dirname(__file__), conf)
         creds = join(dirname(__file__), creds)
         
-        with open(conf, 'r', encoding= 'utf-8') as f:
-            self.log.info(f'Found config at {conf}')
-            self.conf = safe_load(f)
-            
-            
-        if getenv('BOT_CRED'):
-            self.__creds = safe_load(getenv('BOT_CRED'))
-        
-        else:
+        self.updateConf()
+
+        if exists(creds):
             with open(creds,'r',encoding= 'utf-8') as f:
                 self.log.info(f'Found login data at {creds}')
-                self.__creds = safe_load(f)   
-            
-            
-            
-            
+                self.__creds = safe_load(f) 
+          
+        else:
+            self.__creds = safe_load(getenv('BOT_CRED'))
+
         import assets
         self.cards = assets.cards(self)
         self.rank = assets.rank(self)
@@ -40,6 +34,13 @@ class config:
         self.vk = backend.VK(self.__creds['VK'])
         
         self.log.info('Config Loaded')
+       
+       
+    def updateConf(self):
+        with open(self.confLocation, 'r', encoding= 'utf-8') as f:
+            self.log.info(f'Found config at {self.confLocation}')
+            self.conf = safe_load(f)
+       
         
     def DBConn(self) -> backend.DB:
         self.log.info('New DB Connection')

@@ -10,11 +10,11 @@ FORMATSTATS = {
 class botUtils:
     def formatStats(stats: dict):
         return [
-            f'{val} {FORMATSTATS[key][0 if val % 10 == 1 else 1 if val % 10 <= 4 and val % 10 >= 2 else 2]}'
+            f'{val} {FORMATSTATS[key][0 if val % 10 == 1 else 1 if val % 10 <= 4 and val % 10 >= 2 and val not in range(10, 20) else 2]}'
             for key, val in stats.items()
         ]
     
-    def formatCards(cardData: dict, cardCount: int = 1):
+    def formatCards(cardData: dict, cardCount: int = 1, *, raritySymbol: bool = True):
         
         """
         About repeat or scraps
@@ -24,11 +24,11 @@ class botUtils:
         return ' '.join(
             filter(
                 None, [
-                    cardData['raritySymbol'],
+                    cardData['raritySymbol'] if raritySymbol else '',
                     cardData['name'],
                     f'(Ур. {cardData["level"]})' if cardData["level"] > 1 else '',
                     f'(x{cardCount})' if cardCount > 1 else '',
-                    '(За повторки)' if cardData.get('repeat') else f'({cardData.get("scrapCost")} {"Обрывок" if cardData.get("scrapCost") % 10 == 1 else "Обрывка" if cardData.get("scrapCost") % 10 > 1 and cardData.get("scrapCost") % 10 < 5 else "Обрывков"})' if cardData.get("scrapCost") else ''                   
+                    '(За повторки)' if cardData.get('repeat') else f"({botUtils.formatStats({'scraps': cardData.get('scrapCost')})[0]})" if cardData.get("scrapCost") else ''                   
                 ]
             )
         )  

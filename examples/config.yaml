@@ -3,87 +3,133 @@ status:
 
   defaultstatus: 7
 
-  names:
-    - STATUS 1
-    - STATUS 2
-    - STATUS 3
-    - STATUS 4
+     -
+      name: STATUS 1
 
-  battles:
-    amount:
-      - 5
-      - 6
-      - 7
-      - 32767
+      battles:
+        count: 5
 
-    judge:
-      -
-        balance: 1
-      -
-        balance: 1
-      -
-        balance: 1
-      -
-        balance: 1000
+        judge:
+          balance: 1
 
-    win:
-      -
-        balance: 10
-        scraps: 3
-      -
-        balance: 10
-        scraps: 3
-      -
-        balance: 15
-        scraps: 3
-      -
-        balance: 10000
-        scraps: 5000 
+        win:
+          balance: 10
+          scraps: 3
 
-    lose:
-      -
-        balance: 5
-      -
-        balance: 10
-      -
-        balance: 10
-      -
-        balance: 10000 
+        lose:
+          balance: 5
 
-  streak:
-    count:
-      win:
-        - 5
-        - 5
-        - 5
-        - 5
+      streak:
+        judge:
+          count: 10
+          reward:
+            balance: 10
 
-      lose:
-        - 5
-        - 5
-        - 5
-        - 5
+        win:
+          count: 5
+          reward:
+            balance: 20
 
-    reward:
-      win:
-        -
-          balance: 20
-        -
-          balance: 20
-        -
-          balance: 20
-        -
-          balance: 20
+        lose:
+          count: 5
+          reward:
+            scraps: 5
 
-      lose:
-        -
-          scraps: 5
-        -
-          scraps: 5
-        -
-          scraps: 5
-        -
-          scraps: 5
+    -
+      name: STATUS 2
+
+      battles:
+        count: 6
+
+        judge:
+          balance: 1
+
+        win:
+          balance: 10
+          scraps: 3
+
+        lose:
+          balance: 10
+
+      streak:
+        judge:
+          count: 5
+          reward:
+            balance: 10
+
+        win:
+          count: 5
+          reward:
+            balance: 20
+
+        lose:
+          count: 5
+          reward:
+            scraps: 5
+
+    -
+      name: STATUS 3
+
+      battles:
+        count: 7
+
+        judge:
+          balance: 1
+
+        win:
+          balance: 15
+          scraps: 3
+
+        lose:
+          balance: 10
+
+      streak:
+        judge:
+          count: 5
+          reward:
+            balance: 10
+
+        win:
+          count: 5
+          reward:
+            balance: 20
+
+        lose:
+          count: 5
+          reward:
+            scraps: 5
+
+    -
+      name: STATUS 4
+
+      battles:
+        count: 32767
+
+        judge:
+          balance: 10000
+
+        win:
+          balance: 10000
+          scraps: 10000
+
+        lose:
+          balance: 10000
+
+      streak:
+        judge:
+          count: 2
+          reward:
+            balance: 10000
+
+        win:
+          count: 2
+          reward:
+            balance: 10000
+
+        lose:
+          count: 2
+          reward:
+            scraps: 10000
  
 lobby:
   maxPlayers:
@@ -191,10 +237,12 @@ game:
       multiplier: 0.7
      
     indicators:
+      '5': 🤡
       '4': 🟨
       '3': 🟪
       '2': 🟦
       '1': 🟩
+      '-1': 🟥
 
     defaultChance:
       '4': 2
@@ -420,6 +468,7 @@ dialogs:
       Приветствие
       Напиши меня
       Текст
+
     keyboard: 
       buttons:
       - -
@@ -434,12 +483,12 @@ dialogs:
                   - 2
                   - 3
               -
-                dialog: profile
+                profile: None
 
 
   profile:
     message: |
-      Ваш статус: {status}
+      Ваш статус: {status} {statusDays}
       Ваш ранг: {rank}
       Ваш баланс: {balance}
       Количество обрывков: {scraps}
@@ -485,23 +534,23 @@ dialogs:
     message: |
       Магазин
 
-      Обычный пак: 100 монет
+      Обычный пак: {key[packs][0]} монет
       Шансы выпадения:
         85% - обычная
         15% - редкая
 
-      Редкий пак: 150 монет
+      Редкий пак: {key[packs][1]} монет
       Шансы выпадения: 
         5% - обычная
         85% - редкая
         10% - эпическая
 
-      Эпический пак: 200 монет
+      Эпический пак: {key[packs][2]} монет
       Шансы выпадения:
         92% - эпическая
         8% - легендарная
       
-      Рандом пак: 170 монет
+      Рандом пак: {key[packs][3]} монет
       Шансы выпадения: 
         Любая карта 1 уровня
 
@@ -536,16 +585,16 @@ dialogs:
             type: text
             label: Назад
             payload:
-              dialog: profile
+              profile: None
           color: primary
 
 
   notEnoughMoney:
-    message: |
+    message: >
       У вас не хватает денег. Продолжайте играть, чтобы заработать
 
   notEnoughScraps:
-    message: |
+    message: >
       У вас не хватает обрывков. 
   
   purchase:
@@ -560,11 +609,11 @@ dialogs:
       {card}
 
   upgradeFail:
-    message: |
+    message: >
       У вас нет подходящих карт для улучшения
 
   collection:
-    message: |
+    message: >
       Выберите уровень
 
     keyboard: 
@@ -575,16 +624,24 @@ dialogs:
             payload: 
               showCards:
                 level: '1'
-
           color: primary
+
         - action:
             type: text
             label: 2 уровень
             payload: 
               showCards:
                 level: '2'
-
           color: primary
+
+        - action:
+            type: text
+            label: 3 уровень
+            payload: 
+              showCards:
+                level: '3'
+          color: primary
+
       - - action:
             type: text
             label: Назад
@@ -595,7 +652,7 @@ dialogs:
 
   noCards:
     message: |
-      У вас нет карт  такого типа
+      У вас нет карт такого типа
 
   noCardsPlr:
     message: |
@@ -619,11 +676,11 @@ dialogs:
 
   firstPlayer:
     message: |
-      Ходит первый игрок
+      Ходит карта, брошенная первой
 
   secondPlayer:
     message: |
-      Ходит второй игрок
+      Ходит карта, брошенная второй
 
   profile_inline_otheruser:
     message: |
@@ -685,6 +742,22 @@ dialogs:
 
       Ваш баланс: {balance}
 
+  varenik:
+    message: >
+      Все это время Саня просто пинал хуи
+
+  leha: 
+    message: >
+      400 тонн золота грезят о нем
+
+      Создал карты и механики. PR менеджер
+
+  gerych:
+    message: >
+      Если ты создал вселенную, то в ней ты сильнее всех
+
+      Технарь - написал бота и держит сервер с ним
+
   packs:
     message: |
       Ваши паки:
@@ -724,24 +797,24 @@ dialogs:
             type: text
             label: В профиль
             payload: 
-              dialog: profile
+              profile: None
           color: primary
 
 
   noPack:
-    message: |
+    message: >
       У вас нет этого пака
 
   cantError:
-    message: |
+    message: >
       Воу... А я так не могу...
 
   cardDoesNotExist:
-    message: |
+    message: >
       Такой карты пока не существует
 
   wrongNumber:
-    message: |
+    message: >
       Упс... А номер неправильный
 
   noDestoyableCards:
@@ -750,7 +823,7 @@ dialogs:
       Ой, я имел в виду ваши карты
 
   gotPack:
-    message: |
+    message: >
       Перейти к пакам?
 
     keyboard: 
@@ -771,7 +844,7 @@ dialogs:
               type: text
               label: В профиль
               payload: 
-                dialog: profile
+                profile: None
             color: primary
 
 
@@ -815,13 +888,13 @@ dialogs:
             type: text
             label: В профиль
             payload: 
-              dialog: profile
+              profile: None
           color: primary
 
   kb_placeholder:
-    message: |
-      Изыйди, клава
+    message: Изыйди, клава
     keyboard: 
+      one_itme: true
       buttons: []
 
   lobbySearch:
@@ -837,8 +910,7 @@ dialogs:
     
 
   stopLobbySearch:
-    message: |
-      Поиск лобби отменен
+    message: Поиск лобби отменен
 
     keyboard:
       buttons:
@@ -846,12 +918,12 @@ dialogs:
               type: text
               label: В профиль
               payload: 
-                dialog: profile
+                profile: None
             color: primary
 
 
   game_search:
-    message: |
+    message: >
       Выберите вашу роль
 
     keyboard: 
@@ -878,11 +950,11 @@ dialogs:
             type: text
             label: Назад
             payload: 
-              dialog: profile
+              profile: None
           color: primary
 
   nobattles:
-    message: |
+    message: >
       У вас нет боев. Вы сможете играть снова завтра после 12:00 по МСК
 
     keyboard: 
@@ -891,22 +963,29 @@ dialogs:
             type: text
             label: В профиль
             payload: 
-              dialog: profile
+              profile: None
           color: primary
 
 
 
   nouser:
-    message: |
+    message: >
       Данного пользователя нет в базе данных. 
 
   dialogError:
-    message: |
+    message: >
       Ой, а такого диалога нет...
+
+  randomRole:
+    message: >
+      Ваша роль - {key[role]}
+
 
   lobbyReady:
     message: |
-      Лобби в сборе! Нажмите "Готов", чтобы подтвердить свою готовность
+      Лобби в сборе! Можете начинать игру!
+      
+      Не забудьте нажать "Готов"
     keyboard: 
       one_time: true
       buttons:
@@ -914,16 +993,105 @@ dialogs:
               type: text
               label: Готов
               payload: 
-                game: ready
+                - ready: None
+                - actions: None
             color: primary
   
-  lobbyActive:
+  lobbyActivePlayer:
     message: |
       Все готовы! Можете начинать игру
 
-  AFKcomp:
+      Напоминаю, вы игрок
+
+  judgeActions:
     message: |
-      Один из игроков не был готов, поэтому вам были даны монеты
+      Ваши действия?
+
+    keyboard:
+      buttons:
+      - - action:
+            type: text
+            label: Дать победу 1 игроку
+            payload: 
+              win: '1'
+          color: primary
+
+        - action:
+            type: text
+            label: Дать победу 2 игроку
+            payload: 
+              win: '2'
+          color: primary
+
+      - - action:
+            type: text
+            label: Флип
+            payload: 
+              flip: None
+          color: primary
+
+  playerActions:
+    message: |
+      Ваши действия?
+
+    keyboard:
+      buttons:
+      - - action:
+            type: text
+            label: Показать все карты
+            payload: 
+              showCards: ""
+          color: primary
+
+  profile_game:
+    message: |
+        Ваш статус: {status} {statusDays}
+        Ваш ранг: {rank}
+        Ваш баланс: {balance}
+        Количество обрывков: {scraps}
+        Осталось боев: {battles}
+
+        Cтатус боя - {key[lobbyStatus]}
+        Роль - {key[role]}
+        
+    keyboard:
+      buttons:
+      - - action:
+            type: text
+            label: Магазин
+            payload:
+              dialog: shop
+          color: primary
+        - action:
+            type: text
+            label: Коллекции
+            payload: 
+              dialog:
+                collection
+          color: primary
+      - - action:
+            type: text
+            label: Прокачка
+            payload: 
+              upgrade: ''
+          color: primary
+        - action:
+            type: text
+            label: Паки
+            payload: 
+              dialog:
+                packs
+          color: primary
+      - - action:
+            type: text
+            label: Игра
+            payload: 
+              actions: None
+          color: primary
+
+  AFKcomp:
+    message: >
+      Один из игроков не отвечал долгое время, поэтому вам были даны монеты
 
     keyboard:
       buttons:
@@ -931,12 +1099,12 @@ dialogs:
               type: text
               label: В профиль
               payload: 
-                dialog: profile
+                profile: None
             color: primary
 
   AFKpun:
-    message: |
-      Вы задерживали игроков, которые хотели поиграть, поэтому у вас отняли часть монет
+    message: >
+      У вас отняли часть монет в качестве штрафа за АФК
 
     keyboard:
       buttons:
@@ -944,5 +1112,124 @@ dialogs:
               type: text
               label: В профиль
               payload: 
-                dialog: profile
+                profile: None
             color: primary
+
+  cantTrade:
+    message:
+      Извините, но такой обмен невозможен
+
+  trade:
+    message: |
+      Конвертация успешна
+       
+      {key[convertFrom]} -> {key[convertTo]}
+
+  updateConf:
+    message:
+       "Конфиг успешно обновлен"
+
+  statusUpgrade:
+    message: |
+      Вам был выдан статус {status}
+
+      Ваш статус истекает через {key[statusDays]}
+
+  statusExpire:
+    message: |
+      Ваш статус {status} истек
+
+      Для пополнения обратитесь в администрацию
+
+  winTemplate:
+    message: |
+      Вы победили! 
+      
+      Вы получаете:
+        {key[formatStats][0]}
+        {key[formatStats][1]}
+
+    keyboard:
+      buttons:
+        - - action:
+              type: text
+              label: В профиль
+              payload: 
+                profile: None
+            color: primary
+
+  winTemplateStreak:
+    message: |
+      Винстрик!
+      
+      Вы получаете:
+        {key[formatStats][0]}
+
+  loseTemplate:
+    message: |
+      Вы проиграли! 
+      
+      Вы получаете:
+        {key[formatStats][0]}
+
+    keyboard:
+      buttons:
+        - - action:
+              type: text
+              label: В профиль
+              payload: 
+                profile: None
+            color: primary
+
+  loseTemplateStreak:
+    message: |
+      Ну вот... Лузстрик...
+      
+      Вы получаете:
+        {key[formatStats][0]}
+
+  judgeTemplate:
+    message: |
+      За судейство вы получаете:
+        {key[formatStats][0]}
+
+    keyboard:
+      buttons:
+        - - action:
+              type: text
+              label: В профиль
+              payload: 
+                profile: None
+            color: primary
+
+  judgeTemplateStreak:
+    message: |
+      Спасибо что активно судите!
+      
+      Вы получаете:
+        {key[formatStats][0]}
+
+  topExp:
+    message: |
+      Топ по ММР:
+
+      {key[topExp]}
+
+  upgradeCards:
+    message: |
+      Список карт, доступных для улучшения:
+
+      {key[upgradeCardsList]}
+
+      Чтобы улучшить карту, напишите .ап <карта>
+
+  undefinedCard:
+    message: |
+      По вашим ключевым словам было найдено несколько карт.
+      Пожалуйста, введите название карты поточнее
+
+  minimumCards:
+    message: |
+      Извините, но у вас сейчас минимальное количество карт
+      
+      Вам нужна еще одна любая карта

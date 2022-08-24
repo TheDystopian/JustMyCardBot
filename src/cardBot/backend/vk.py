@@ -113,3 +113,22 @@ class VK:
             for atch in attachments
             if atch["type"] not in {'sticker'}
         ]
+
+    def getUsernames(self, usernames: int|str):
+        return [
+            '[{}|{}]'.format(
+                name['screen_name'],
+                ' '.join([
+                        name.get('first_name', ''),
+                        name.get('last_name', '')
+                    ])
+            )
+            
+            for name in self.__vk_session.method(
+                "users.get",
+                {
+                    "user_ids": usernames,
+                    "fields": "screen_name"
+                } 
+            )
+        ]

@@ -1,6 +1,6 @@
+from operator import itemgetter
 from time import time
 from random import choice, randrange
-from typing import Iterable
 from backend.db import DB
 from functions.card_utils import botUtils
 import functions.game as funcgame
@@ -15,31 +15,31 @@ class UserError(Exception):
 
 
 class generalFunctions:
-    def dialog(self, dialog, data):
+    def dialog(self, dialog):
         self.conf.vk.send(
             self.conf.dialogs.getDialogParsed(
-                data['vk']['peer_id'], 
+                self.data['vk']['peer_id'], 
                 dialog, 
-                userdata = data['db'],
+                userdata = self.data['db'],
                 packs = [i.get("price") for i in self.conf['game']["packs"]]
             )
         )
     
-    def flip(self, _, data):
+    def flip(self, _):
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
-                data['vk']['peer_id'], 
+                self.data['vk']['peer_id'], 
                 preset = choice(["firstPlayer", "secondPlayer"])
             )
         )
     
-    def openPack(self, pack, data):
-        if not data["db"]["packs"][pack]:
+    def openPack(self, pack):
+        if not self.data["db"]["packs"][pack]:
             raise UserError('noPack')
 
         self.editDB = True
-        data["db"]["packs"][pack] -= 1
-        data["db"]["cards"].append(
+        self.data["db"]["packs"][pack] -= 1
+        self.data["db"]["cards"].append(
             self.conf.cards.getCardByRarity(
                 chances=self.conf['game']["packs"][pack]["rarities"]
             )
@@ -47,48 +47,48 @@ class generalFunctions:
 
         self.conf.vk.send(
             self.conf.dialogs.getDialogParsed(
-                data['vk']['peer_id'],
+                self.data['vk']['peer_id'],
                 'purchase',
-                userdata = data['db'],
+                userdata = self.data['db'],
                 selectCard= -1
             )
         )
     
-    def getPack(self, pack, data):    
-        if self.conf['game']["packs"][pack]["price"] > data["db"]["balance"]:
+    def getPack(self, pack):    
+        if self.conf['game']["packs"][pack]["price"] > self.data["db"]["balance"]:
             raise UserError('notEnoughMoney')
 
         self.editDB = True
-        data["db"]["balance"] -= self.conf['game']["packs"][pack]["price"]
-        data["db"]["packs"][pack] += 1
+        self.data["db"]["balance"] -= self.conf['game']["packs"][pack]["price"]
+        self.data["db"]["packs"][pack] += 1
 
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
-                data['vk']['user'],
+                self.data['vk']['user'],
                 preset = "gotPack"
             )    
         )    
     
-    def addCardsPool(self, pool, data):
+    def addCardsPool(self, pool):
         self.editDB = True
-        data["db"]["cards"].extend(self.conf.cards.getCardByPool(pool))
+        self.data["db"]["cards"].extend(self.conf.cards.getCardByPool(pool))
         self.conf.vk.send(
             self.conf.dialogs.getDialogParsed(
-                data['vk']['peer_id'],
+                self.data['vk']['peer_id'],
                 preset = 'poolcards',
-                userdata = data['db'],
+                userdata = self.data['db'],
                 selectCard = list(range(-len(pool),0))
             )
         )
     
-    def showCards(self, cards, data):
-        if not data["db"]["cards"]:
+    def showCards(self, cards):
+        if not self.data["db"]["cards"]:
             raise UserError('noCards')
         
-        isChat = data['vk']['user'] != data['vk']['peer_id']
+        isChat = self.data['vk']['user'] != self.data['vk']['peer_id']
         showPict = False
         
-        cardData = self.conf.cards.getOwnedCards(data['db']['cards'])
+        cardData = self.conf.cards.getOwnedCards(self.data['db']['cards'])
         
         cardData = [
             (cd, cardData.count(cd))
@@ -127,7 +127,7 @@ class generalFunctions:
         if not isChat or showPict:
             [self.conf.vk.send(
                 self.conf.dialogs.getDialogPlain(
-                    data['vk']['peer_id'],
+                    self.data['vk']['peer_id'],
                     text = f'x{cardCount}' if cardCount > 1 else '' 
                 ),
                 attachments= cardData['attachment']
@@ -138,7 +138,7 @@ class generalFunctions:
         else:
             self.conf.vk.send(
                 self.conf.dialogs.getDialogPlain(
-                    data['vk']['peer_id'],
+                    self.data['vk']['peer_id'],
                     text = f'''Ваши карты:\n\n{
                         chr(10).join([
                         botUtils.formatCards(cdt, ccnt)
@@ -147,49 +147,52 @@ class generalFunctions:
                 ),    
             )
             
-    def give(self, thing, data):
+    def give(self, thing):
         if not thing:
             raise UserError('cantError')
         
         if (
-            data['vk']['reply_id'] is None 
-            or data['vk']['reply_id'] == data['vk']['user']
+            self.data['vk']['reply_id'] is None 
+            or self.data['vk']['reply_id'] == self.data['vk']['user']
         ):
-            user = data['db']
+            user = self.data['db']
             if self.editDB:
                 self.db.edit(user)
             
             self.editDB = False
         else:
-            user = self.db.get(user = data["vk"]["reply_id"])
+            user = self.db.get(user = self.data["vk"]["reply_id"])
 
         if (
             isinstance(thing, list)
-            and thing[0].lower() in {i.lower() for i in self.conf['status']['names']}   
+            and thing[0].lower() in {i['name'].lower() for i in self.conf['status']['status']}   
         ):
-            user['status'] = next(
+            status = next(
                 num
-                for num, status in enumerate(self.conf['status']['names'])
-                if thing[0].lower() == status.lower()
+                for num, status in enumerate(self.conf['status']['status'])
+                if thing[0].lower() == status['name'].lower()
             )
         
             statusDays = (
                 int(thing[-1])
                 if len(thing) > 1 and thing[-1].isdecimal()
-                else self.conf['status']["defaultDays"]
+                else self.conf['status']["defaultDuration"]
             )
             
-            user['day'] = int(time() // 86400 + statusDays + 1)
+            user['day'] = int(time() // 86400 + statusDays)
+            user['battles'] += self.conf['status']['status'][status]['battles']['count'] - self.conf['status']['status'][user['status']]['battles']['count']
+            user['status'] = status
             
             self.conf.vk.send(
-                self.conf.dialogs.getDialogPlain(
+                self.conf.dialogs.getDialogParsed(
                     user['id'],
-                    text = f'''
-Вам был выдан статус {self.conf['status']['names'][user['status']]}\n
-Истекает через {statusDays} {"день" if statusDays % 10 == 1 else "дня" if statusDays % 10 < 5 and statusDays % 10 >= 2 else "дней"}
-                    '''
+                    'statusUpgrade',
+                    userdata = user,
+                    statusDays = f'{statusDays} {"день" if statusDays % 10 == 1 else "дня" if statusDays % 10 < 5 and statusDays % 10 >= 2 else "дней"}'
                 )
             )
+            
+            
             self.db.edit(user)
             return
 
@@ -201,13 +204,13 @@ class generalFunctions:
             
             botUtils.changeStats(
                 user, 
-                stats = {'wins': 1} | self.conf['status']["battles"]['win'][user["status"]]
+                stats = {'win': 1} | self.conf['status']['status'][user['status']]['battles']['win']
             )
             
-            if not user['battles'] % self.conf['status']["streak"]['count']['win'][user["status"]]:
+            if not user['battles'] % self.conf['status']['status'][user["status"]]["streak"]['win']['count']:
                 botUtils.changeStats(
                     user, 
-                    stats = self.conf['status']["streak"]['reward']['win'][user["status"]]
+                    stats = self.conf['status']['status'][user["status"]]["streak"]['win']['reward']
                 )
             
         elif thing.get('lose', False) != False:
@@ -215,13 +218,13 @@ class generalFunctions:
             
             botUtils.changeStats(
                 user, 
-                stats = {'loses': 1} | self.conf['status']["battles"]['lose'][user["status"]]
+                stats = {'lose': 1} | self.conf['status']['status'][user['status']]['battles']['lose']
             )
             
-            if not user['battles'] % self.conf['status']["streak"]['count']['lose'][user["status"]]:
+            if not user['battles'] % self.conf['status']['status'][user["status"]]["streak"]['lose']['count']:
                 botUtils.changeStats(
                     user, 
-                    stats = self.conf['status']["streak"]['reward']['lose'][user["status"]]
+                    stats =  self.conf['status']['status'][user["status"]]["streak"]['lose']['reward']
                 )
     
         elif (
@@ -284,18 +287,18 @@ class generalFunctions:
         
         self.db.edit(user)
     
-    def remove(self, thing, data):
+    def remove(self, thing):
         if not thing:
             raise UserError('cantError')
         
         if (
-            data['vk']['reply_id'] is not None 
-            and data['vk']['reply_id'] != data['vk']['user']
+            self.data['vk']['reply_id'] is not None 
+            and self.data['vk']['reply_id'] != self.data['vk']['user']
         ):
-            user = self.db.get(data['vk']['reply_id'])
+            user = self.db.get(self.data['vk']['reply_id'])
         
         else:
-            user = data['db']
+            user = self.data['db']
             if self.editDB:
                 self.db.edit(user)
                 
@@ -307,19 +310,19 @@ class generalFunctions:
         if thing.get('win', False) != False:
             self.conf.rank.rwin(user)
             
-            if not user['battles'] % self.conf['status']["streak"]['count']['win'][user["status"]]:
+            if not user['battles'] % self.conf['status']['status'][user["status"]]["streak"]['win']['count']:
                 botUtils.changeStats(
                     user,
                     {key: -val
-                    for key, val in self.conf['status']["streak"]['reward']['win'][user["status"]]
+                    for key, val in self.conf['status']['status'][user["status"]]["streak"]['win']['count']
                     }
                 )
             
             botUtils.changeStats(
                 user,
-                {'wins': -1} | {
+                {'win': -1} | {
                     key: -val
-                    for key, val in self.conf['status']["battles"]['win'][user["status"]]
+                    for key, val in self.conf['status']['status'][user["status"]]["streak"]['win']['reward']
                 }
             )
             
@@ -327,19 +330,19 @@ class generalFunctions:
         elif thing.get('lose', False) != False:
             self.conf.rank.rlose(user)
             
-            if not user['battles'] % self.conf['status']["streak"]['count']['win'][user["status"]]:
+            if not user['battles'] % self.conf['status']['status'][user["status"]]["streak"]['lose']['count']:
                 botUtils.changeStats(
                     user,
                     {key: -val
-                    for key, val in self.conf['status']["streak"]['reward']['win'][user["status"]]
+                    for key, val in self.conf['status']['status'][user["status"]]["streak"]['lose']['count']
                     }
                 )
             
             botUtils.changeStats(
                 user,
-                {'loses': -1} | {
+                {'lose': -1} | {
                     key: -val
-                    for key, val in self.conf['status']["battles"]['lose'][user["status"]]
+                    for key, val in self.conf['status']['status'][user["status"]]["streak"]['lose']['reward']
                 }
             )
     
@@ -373,7 +376,7 @@ class generalFunctions:
             )
             
             if foundCardID is None:
-                raise UserError('noСards')
+                raise UserError('noCardsPlr')
             
             user['cards'].pop(foundCardID)
     
@@ -381,36 +384,34 @@ class generalFunctions:
         
         self.db.edit(user)
         
-    def profile(self, _, data):
-        isChat = data['vk']['peer_id'] != data['vk']['user']
+    def profile(self, _):
+        isAdmin = self.conf.vk.isAdmin(self.data["vk"]["peer_id"], self.data["vk"]["user"])
+        isChat = self.data['vk']['peer_id'] != self.data['vk']['user']
         
-        if (
-            data['vk']['reply_id'] is None 
-            or data['vk']['reply_id'] == data['vk']['user'] 
-        ):
-            self.conf.vk.send(
-                self.conf.dialogs.getDialogParsed(data['vk']['peer_id'], 'profile', userdata = data['db']) 
-                | ({'keyboard': None} if isChat else {}) 
-            )
-    
+        if self.data['vk']['reply_id']:
+            userData = self.db.get(user = self.data['vk']['reply_id'])
         else:
-            isAdmin = self.conf.vk.isAdmin(data["vk"]["peer_id"], data["vk"]["user"])
-            userData = self.db.get(user = data['vk']['reply_id'])
-            
+            userData = self.data['db']
+        
+        if isAdmin:
             self.conf.vk.send(
                 self.conf.dialogs.getDialogParsed(
-                    data['vk']['user'] if isAdmin 
-                        else data['vk']['peer_id'], 
-                        
-                    'profile' if isAdmin
-                        else "profile_inline_otheruser",
-                         
-                    userdata = userData
-                    ) 
-            | {'keyboard': None}
-            ) 
+                    self.data['vk']['user'] if self.data['vk']['reply_id'] != self.data['vk']['user'] and self.data['vk']['reply_id'] is not None else self.data['vk']['peer_id'],
+                    'profile',
+                    userdata = userData 
+                ) | ({'keyboard': None} if isChat else {}) 
+            )
+            return
+        
+        self.conf.vk.send(
+            self.conf.dialogs.getDialogParsed(
+                self.data['vk']['peer_id'],
+                'profile_inline_otheruser' if self.data['vk']['reply_id'] != self.data['vk']['user'] and self.data['vk']['reply_id'] is not None else 'profile',
+                userdata = userData 
+            ) | ({'keyboard': None} if isChat else {}) 
+        )
                 
-    def chance(self, chance, data):
+    def chance(self, chance):
         if not chance: 
             raise UserError('cantError')
         
@@ -419,16 +420,16 @@ class generalFunctions:
         
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
-                data['vk']['peer_id'],
+                self.data['vk']['peer_id'],
                 text = 'Успешно' 
                     if randrange(1, 101) <= int(chance[0])
                     else 'Не успешно'
             )
         )
         
-    def destroy(self, card, data):
-        if len(data['db']['cards']) <= self.conf['game']['cards']['break'].get("minimumCards", 0):
-            raise UserError('noDestoyableCards')
+    def destroy(self, card):
+        if len(self.data['db']['cards']) <= self.conf['game']['cards']['break'].get("minimumCards", 0):
+            raise UserError('minimumCards')
         
         if (
             not isinstance(card, list)
@@ -436,7 +437,7 @@ class generalFunctions:
         ):
             raise UserError('cantError')
         
-        cardDataAll = self.conf.cards.getOwnedCards(data['db']['cards'])
+        cardDataAll = self.conf.cards.getOwnedCards(self.data['db']['cards'])
         
         cardLevel = None
         if card[-1].lstrip().isdecimal():
@@ -477,111 +478,112 @@ class generalFunctions:
         
         
         self.editDB = True
-        data['db']['cards'].pop(cardIndex)
-        data['db']['scraps'] += cardPrice
+        self.data['db']['cards'].pop(cardIndex)
+        self.data['db']['scraps'] += cardPrice
         
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
-                data['vk']['peer_id'],
+                self.data['vk']['peer_id'],
                 text = f'Разорвана карта\n{botUtils.formatCards(cardData)}\nВы получаете {cardPrice} обрывков',
             )
         )    
     
-    def upgrade(self, card, data):
-        cardData = self.conf.cards.getOwnedCards(data['db']['cards'])
+    def upgrade(self, card):
+        if len(self.data['db']['cards']) <= self.conf['game']['cards']['break'].get("minimumCards", 0):
+            raise UserError('minimumCards')
+        
+        cardData = self.conf.cards.getOwnedCards(self.data['db']['cards'])
         
         upgradeableCards = [
             cardData[cd['index']] | cd
             for cd in botUtils.findUpgradeableCards(
             cardData,
             self.conf['game']['cards']['upgrade'],
-            data['db']['scraps']        
+            self.data['db']['scraps']        
         )]
-        
-        
         
         if not card:
             if not upgradeableCards:
                 raise UserError('upgradeFail')
 
-            self.conf.vk.send(
-                self.conf.dialogs.getDialogPlain(
-                    data['vk']['peer_id'],
-                    text = f"""
-Список карт, доступных для улучшения:\n\n
-{
-    chr(10).join([
-        botUtils.formatCards(cd)
-        for cd in upgradeableCards
-    ])
-}
-
-Стобы улучшить карту, напишите .ап <карта>
-                    """
+            return self.conf.vk.send(
+                self.conf.dialogs.getDialogParsed(
+                    self.data['vk']['peer_id'],
+                    preset = 'upgradeCards',
+                    upgradeCardsList = '\n'.join([
+                        botUtils.formatCards(cd)
+                        for cd in upgradeableCards
+                    ])
                 )
             )
-            
-        else:
-            if not isinstance(card, list): return
-            
-            card = next((
+
+        if not isinstance(card, list): return
+        
+        
+        card = sorted([
                 cardd
                 for cardd in upgradeableCards
-                if cardd['name'].lower().find(' '.join(card)) != -1
-            ), None)
-            
-            if card is None:
-                raise UserError('upgradeFail')
-            
-            self.conf.vk.send(
-                self.conf.dialogs.getDialogParsed(
-                    data['vk']['peer_id'],
-                    "upgraded",
-                    userdata = data['db'],
-                    selectCard = card['index']
-                )
+                if cardd['name'].lower().find(' '.join(card)) != -1  
+                ],
+                reverse = True,
+                key = itemgetter('level')
             )
-            
-            self.editDB = True
-            if card.get('repeat'):
-                cardIndex = card['index']
-                  
-                for _ in range(card.get('repeat') - 1):
-                    data['db']['cards'].pop(
-                        data['db']['cards'].index(
-                            data['db']['cards'][cardIndex]
-                        )
-                    )
-                    cardIndex -= 1
-                    
-                data['db']['cards'][cardIndex]['level'] += 1  
-                
-            elif card.get('scrapCost'):
-                data['db']['cards'][card['index']]['level'] += 1
-                data['db']['scraps'] -= card['scrapCost'] 
 
-    def game(self, _role, data):
+        if card is None:
+            raise UserError('upgradeFail')
+        
+        card = card[0]
+        
+        self.conf.vk.send(
+            self.conf.dialogs.getDialogParsed(
+                self.data['vk']['peer_id'],
+                "upgraded",
+                userdata = self.data['db'],
+                selectCard = card['index']
+            )
+        )
+        
+        self.editDB = True
+        if card.get('repeat'):
+            cardIndex = card['index']
+                
+            for _ in range(card.get('repeat') - 1):
+                self.data['db']['cards'].pop(
+                    self.data['db']['cards'].index(
+                        self.data['db']['cards'][cardIndex]
+                    )
+                )
+                cardIndex -= 1
+                
+            self.data['db']['cards'][cardIndex]['level'] += 1  
+            
+        elif card.get('scrapCost'):
+            self.data['db']['cards'][card['index']]['level'] += 1
+            self.data['db']['scraps'] -= card['scrapCost'] 
+
+    def game(self, _role):
         if 'stop' in _role:
             self.payload.append({'dialog': 'profile'})
             return
         
         if "random" in _role:
             _role = choice(('player', 'judge'))
+
             
-        if data['db']['battles'] <= 0 and _role == 'player': 
+        if self.data['db']['battles'] <= 0 and _role == 'player': 
             raise UserError('nobattles')
         
         self.conf.vk.send(
             self.conf.dialogs.getDialogParsed(
-                data['vk']['user'],
+                self.data['vk']['user'],
                 "randomRole",
                 role = getattr(funcgame.role, _role).title
             )
         )
         
-        self._game.addToLobby(data['db']['id'], getattr(funcgame.role, _role))
+        self._game.addToLobby(self.data['db']['id'], getattr(funcgame.role, _role))
 
-    def trade(self, tradeData, data):
+    def trade(self, tradeData):
         if (
             not tradeData
         ):
@@ -592,36 +594,27 @@ class generalFunctions:
                 amount = int(tradeData['balance'][-1])
                 if (
                     amount < 0
-                    or data['db']['balance'] < amount
+                    or self.data['db']['balance'] < amount
                 ):
                     raise ValueError 
             except ValueError:
                 raise UserError('cantTrade')
             
-
             roundBal = amount - (amount % self.conf['game']['trade']['toScraps'])
             addScraps = roundBal // self.conf['game']['trade']['toScraps']
             
             self.editDB = True
-            data['db']['balance'] -= roundBal
-            data['db']['scraps'] += addScraps
+            self.data['db']['balance'] -= roundBal
+            self.data['db']['scraps'] += addScraps
             
-            
-            self.conf.vk.send(
-                self.conf.dialogs.getDialogParsed(
-                    data['vk']['peer_id'],
-                    'tradeScraps',
-                    removeBal = roundBal,
-                    addScraps = addScraps
-                )
-            )
-            
+            convertFrom, convertTo = botUtils.formatStats({'balance': roundBal, 'scraps': addScraps})
+
         elif 'scraps' in tradeData:
             try:
                 amount = int(tradeData['scraps'][-1])
                 if (
                     amount < 0
-                    or data['db']['scraps'] < amount
+                    or self.data['db']['scraps'] < amount
                 ):
                     raise ValueError 
             except ValueError:
@@ -629,34 +622,93 @@ class generalFunctions:
 
             self.editDB = True
             addBalance = amount * self.conf['game']['trade']['toBalance']
-            data['db']['balance'] += addBalance
-            data['db']['scraps'] -= amount
+            self.data['db']['balance'] += addBalance
+            self.data['db']['scraps'] -= amount
             
-            self.conf.vk.send(
-                self.conf.dialogs.getDialogParsed(
-                    data['vk']['peer_id'],
-                    'tradeBalance',
-                    addBal = addBalance,
-                    removeScraps = amount
-                )
-            )
+            convertFrom, convertTo = botUtils.formatStats({'scraps': amount, 'balance': addBalance})
+            
             
         else:
             raise UserError('cantTrade')
         
+        self.conf.vk.send(
+            self.conf.dialogs.getDialogParsed(
+                self.data['vk']['peer_id'],
+                'trade',
+                convertFrom = convertFrom,
+                convertTo = convertTo
+            )
+        )
         
+    def updateConf(self, _):
+        self.conf.updateConf()
+        
+        self.conf.vk.send(
+            self.conf.dialogs.getDialogParsed(
+                self.data['vk']['peer_id'],
+                'updateConf'
+            )
+        )
+    
+    def topExp(self, count):
+        if (
+            not count
+            or not count[-1].isdecimal()
+        ):
+            count = None
+ 
+        users = sorted(
+            [
+                user
+                for user in self.db.get(columns = ['id', 'experience'])
+                if user['experience'] > 0
+            ],
+            key = itemgetter('experience'),
+            reverse=True
+        )
+        
+        if count:
+            users = users[:int(count[-1])]
 
 
+        users = [
+            (place + 1, user, exp)
+            
+            for place, (user, exp) in enumerate(
+                zip(
+                    self.conf.vk.getUsernames(
+                        ','.join(map(str, [users['id'] for users in users])),
+                    ),
+                    ['{} ({})'.format(
+                        users['experience'],
+                        self.conf.rank.getStatus(users)
+                    ) for users in users] 
+                ) 
+            ) 
+        ]
+        
+        self.conf.vk.send(
+            self.conf.dialogs.getDialogParsed(
+                self.data['vk']['peer_id'],
+                'topExp',
+                topExp = '\n'.join([
+                    '{}. {} - {}'.format(*user)
+                    for user in users
+                ])
+            )
+        )
+        
     def __init__(self, conf: config, data: dict = None, payload: list[dict] = None, db: DB = None, _game = None):
         self.conf = conf
         self.db = db
         self._game = _game
         self.editDB = False
-        
+
+        self.data = data
         self.payload = payload
         
         
-        if not isinstance(self.payload, Iterable): return 
+        if not isinstance(self.payload, list): return 
         
         for func in self.payload:
             if not func: continue
@@ -664,14 +716,5 @@ class generalFunctions:
             for key, val in func.items():
                 method = getattr(self, key, None)
                 if method is None: continue
-                
-                
-                try:
-                    method(val, data)
-                except UserError as preset:
-                    self.conf.vk.send(
-                        self.conf.dialogs.getDialogPlain(
-                            data['vk']['peer_id'],
-                            preset=preset.args
-                        )
-                    )
+
+                method(val)
