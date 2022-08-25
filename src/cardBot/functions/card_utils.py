@@ -1,4 +1,4 @@
-from math import ceil
+from math import ceil, floor
 
 
 FORMATSTATS = {
@@ -52,10 +52,11 @@ class botUtils:
     def calculateUpgradePrice(params: dict, card:dict):
         if not params['rarityRatios'].get(str(card['rarity'])): return None
         
-        return \
+        return floor(
             params['defaultPrice'] + \
             params['rarityRatios'][str(card['rarity'])] * \
             card['level'] ** params['defaultPower']
+        )
                 
     def findUpgradeableCards(cards: list, params: dict, scrapCount:int = 0) -> list:
         cardData = [
@@ -86,7 +87,7 @@ class botUtils:
 
                 upgradeableCards.append({
                     "index": cardn,
-                    "scrapCost": int(cardCost)
+                    "scrapCost": cardCost
                 })  
                
         return upgradeableCards

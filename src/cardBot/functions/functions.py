@@ -314,7 +314,7 @@ class generalFunctions:
                 botUtils.changeStats(
                     user,
                     {key: -val
-                    for key, val in self.conf['status']['status'][user["status"]]["streak"]['win']['count']
+                    for key, val in self.conf['status']['status'][user["status"]]["streak"]['win']['count'].items()
                     }
                 )
             
@@ -322,7 +322,7 @@ class generalFunctions:
                 user,
                 {'win': -1} | {
                     key: -val
-                    for key, val in self.conf['status']['status'][user["status"]]["streak"]['win']['reward']
+                    for key, val in self.conf['status']['status'][user["status"]]["streak"]['win']['reward'].items()
                 }
             )
             
@@ -334,7 +334,7 @@ class generalFunctions:
                 botUtils.changeStats(
                     user,
                     {key: -val
-                    for key, val in self.conf['status']['status'][user["status"]]["streak"]['lose']['count']
+                    for key, val in self.conf['status']['status'][user["status"]]["streak"]['lose']['count'].items()
                     }
                 )
             
@@ -342,7 +342,7 @@ class generalFunctions:
                 user,
                 {'lose': -1} | {
                     key: -val
-                    for key, val in self.conf['status']['status'][user["status"]]["streak"]['lose']['reward']
+                    for key, val in self.conf['status']['status'][user["status"]]["streak"]['lose']['reward'].items()
                 }
             )
     
@@ -519,7 +519,6 @@ class generalFunctions:
 
         if not isinstance(card, list): return
         
-        
         card = sorted([
                 cardd
                 for cardd in upgradeableCards
@@ -529,7 +528,7 @@ class generalFunctions:
                 key = itemgetter('level')
             )
 
-        if card is None:
+        if not card:
             raise UserError('upgradeFail')
         
         card = card[0]
