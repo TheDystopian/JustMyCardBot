@@ -237,7 +237,7 @@ class gameFunctions(generalFunctions):
         
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
-                ','.join(map(str, lobby.getPlayerIDs())),
+                ','.join(map(str, self.lobby.getPlayerIDs())),
                 text = 'Успешно' 
                     if randrange(1, 101) <= int(chance[0])
                     else 'Не успешно'
