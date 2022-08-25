@@ -13,7 +13,7 @@ class scheduled:
         
         for user in self.DB.get():
             user['battles'] = self.conf['status']['status'][user['status']]['battles']['count']
-            user["loses"] = user["wins"] = user["judge"] = 0
+            user["lose"] = user["win"] = user["judge"] = 0
             
             if user["status"] and user["day"] - time() // 86400 <= 0:
                 self.conf.vk.send(
