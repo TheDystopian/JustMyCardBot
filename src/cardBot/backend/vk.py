@@ -9,9 +9,7 @@ from requests.exceptions import ReadTimeout
 class VK:
     def __init__(self, config):
         self.__cfg = config
-        self.__vk_session = vk_api.VkApi(
-            token=self.__cfg["key"], api_version="5.144"
-        )
+        self.__vk_session = vk_api.VkApi(token=self.__cfg["key"], api_version="5.144")
         self.__LP = bot_longpoll.VkBotLongPoll(
             self.__vk_session,
             self.__vk_session.method("groups.getById")["groups"][0]["id"],
@@ -21,14 +19,14 @@ class VK:
         if attachments is not None:
             if not sendSeparately:
                 attachments = [",".join(attachments)]
-                
+
             [
                 self.__vk_session.method(
                     "messages.send",
                     {
                         "attachment": atch,
                         "random_id": get_random_id(),
-                        "peer_ids": sendable.get("id",''),
+                        "peer_ids": sendable.get("id", ""),
                         "message": sendable.get("message"),
                         "disable_mentions": True,
                     },
@@ -70,7 +68,9 @@ class VK:
                             "reply_id": event.message.fwd_messages[0]["from_id"]
                             if event.message.fwd_messages
                             else event.message.get("reply_message", {}).get("from_id"),
-                            "attachments": self.generateAttachments(getattr(event.message, 'attachments')),
+                            "attachments": self.generateAttachments(
+                                getattr(event.message, "attachments")
+                            ),
                         }
 
                     if event.type == bot_longpoll.VkBotEventType.MESSAGE_EVENT:
@@ -88,11 +88,14 @@ class VK:
                 sleep(10)
 
     def sendTo(self, msg, category):
-        for admin in self.__cfg['groups'][category]:
+        for admin in self.__cfg["groups"][category]:
             self.send(sendable={"id": admin, "message": msg})
 
     def isAdmin(self, peer, user):
-        return user in {*self.__cfg['groups'].get("admins", []), *self.__cfg['groups'].get("devs", [])} or next(
+        return user in {
+            *self.__cfg["groups"].get("admins", []),
+            *self.__cfg["groups"].get("devs", []),
+        } or next(
             (
                 i.get("is_admin")
                 for i in self.__vk_session.method(
@@ -102,35 +105,34 @@ class VK:
             ),
             False,
         )
-        
+
     def generateAttachments(self, attachments: list[dict]):
         return [
-            atch['type'] + '_'.join(
-                map(str, filter(None,[
-                    atch[atch["type"]].get("owner_id"),
-                    atch[atch["type"]].get("id"),
-                    atch[atch["type"]].get("access_key"),
-                ])
-            ))
+            atch["type"]
+            + "_".join(
+                map(
+                    str,
+                    filter(
+                        None,
+                        [
+                            atch[atch["type"]].get("owner_id"),
+                            atch[atch["type"]].get("id"),
+                            atch[atch["type"]].get("access_key"),
+                        ],
+                    ),
+                )
+            )
             for atch in attachments
-            if atch["type"] not in {'sticker'}
+            if atch["type"] not in {"sticker"}
         ]
 
-    def getUsernames(self, usernames: int|str):
+    def getUsernames(self, usernames: int | str):
         return [
-            '[{}|{}]'.format(
-                name['screen_name'],
-                ' '.join([
-                        name.get('first_name', ''),
-                        name.get('last_name', '')
-                    ])
+            "[{}|{}]".format(
+                name["screen_name"],
+                " ".join([name.get("first_name", ""), name.get("last_name", "")]),
             )
-            
             for name in self.__vk_session.method(
-                "users.get",
-                {
-                    "user_ids": usernames,
-                    "fields": "screen_name"
-                } 
+                "users.get", {"user_ids": usernames, "fields": "screen_name"}
             )
         ]

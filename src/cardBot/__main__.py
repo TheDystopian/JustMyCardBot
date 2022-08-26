@@ -6,8 +6,8 @@ import components.config as config
 conf = config()
 
 processes = [
-    Process(target = bot.Bot, args = (conf,), name = 'Main bot'),
-    Process(target = scheduled, args = (conf,), name = 'Schedule process')
+    Process(target=bot.Bot, args=(conf,), name="Main bot"),
+    Process(target=scheduled, args=(conf,), name="Schedule process"),
 ]
 
 [p.start() for p in processes]
