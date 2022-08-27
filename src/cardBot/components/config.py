@@ -24,12 +24,10 @@ class config:
             with open(creds, "r", encoding="utf-8") as f:
                 self.log.info(f"Found login data at {creds}")
                 self.__creds = safe_load(f)
-
         else:
             self.__creds = safe_load(getenv("BOT_CRED"))
 
         import assets
-
         self.cards = assets.cards(self)
         self.rank = assets.rank(self)
         self.dialogs = assets.dialog(self)

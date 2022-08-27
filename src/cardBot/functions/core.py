@@ -39,25 +39,25 @@ class core:
             "lobby": self.game.findLobby(data["user"]),
         }
 
-    def checkPermissions(self, permissions: list, state: dict):
+    def checkPermissions(self, permissions: list, data: dict) -> bool:
         return not (
-            not state["isAdmin"]
+            not data["isAdmin"]
             and "admins" in permissions
-            or not state["isChat"]
+            or not data["isChat"]
             and not "bot" in permissions
-            or state["isChat"]
+            or data["isChat"]
             and not "chat" in permissions
         )
 
-    def textRecognition(self, data: dict, state: dict):
+    def textRecognition(self, data: dict):
         if (
-            len(data["text"]) < 2
-            or not data["text"][0] in self.config["commands"]["call"]
+            len(data['vk']["text"]) < 2
+            or not data['vk']["text"][0] in self.config["commands"]["call"]
         ):
             return
         payload = []
 
-        for command in data["text"].lower().split():
+        for command in data['vk']["text"].lower().split():
             try:
                 isCommand = command[0] in self.config["commands"]["call"]
 
@@ -71,7 +71,7 @@ class core:
                     command = self.config["commands"]["commands"][key]
 
                     assert self.checkPermissions(
-                        command["permissions"], state
+                        command["permissions"], data
                     ), "cantError"
 
                     payload.append(command.get("payload", {key: []}))
@@ -79,7 +79,7 @@ class core:
 
                 if not payload:
                     continue
-
+                
                 arg = next((arg[0] for arg in self.__args if command in arg), None)
 
                 if arg:
@@ -91,7 +91,7 @@ class core:
             except AssertionError as preset:
                 self.config.vk.send(
                     self.config.dialogs.getDialogPlain(
-                        data["peer_id"], preset=preset.args
+                        data['vk']["peer_id"], preset=preset.args
                     )
                 )
                 continue
@@ -100,20 +100,21 @@ class core:
 
     def core(self, data):
         payload = data["payload"]
-        state = self.messageState(data)
-
         if isinstance(payload, str):
             payload = loads(payload.replace("\\", "").strip('"'))
+        
+        data = {'vk': data} | self.messageState(data)
 
         if payload is None:
-            payload = self.textRecognition(data, state)
-            if not payload and not state["lobby"]:
+            payload = self.textRecognition(data)
+            if not payload and not data["lobby"]:
                 return
 
         if not isinstance(payload, (list, tuple)):
             payload = [payload]
 
-        data = {"vk": data, "db": self.db.get(user=data["user"])}
+        data['vk'].pop('payload')
+        data = data | {'db': self.db.get(user=data['vk']["user"]), 'payload': payload}
 
         if not data["db"]:
             if data["vk"]["peer_id"] != data["vk"]["user"]:
@@ -129,10 +130,10 @@ class core:
 
         try:
             func = (
-                generalFunctions(self.config, data, payload, self.db, self.game)
-                if not state["lobby"] or state["isChat"]
+                generalFunctions(self.config, data, self.db, self.game)
+                if data['isChat'] or not data['lobby']                
                 else gameFunctions(
-                    self.config, state["lobby"], data, payload, self.db, self.game
+                    self.config, data, self.db, self.game
                 )
             )
 

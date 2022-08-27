@@ -12,11 +12,6 @@ class scheduled:
         self.conf.log.info("Event 1 triggered")
 
         for user in self.DB.get():
-            user["battles"] = self.conf["status"]["status"][user["status"]]["battles"][
-                "count"
-            ]
-            user["lose"] = user["win"] = user["judge"] = 0
-
             if user["status"] and user["day"] - time() // 86400 <= 0:
                 self.conf.vk.send(
                     self.conf.dialogs.getDialogParsed(
@@ -24,6 +19,11 @@ class scheduled:
                     )
                 )
                 user["status"] = 0
+            
+            user["battles"] = self.conf["status"]["status"][user["status"]]["battles"][
+                "count"
+            ]
+            user["lose"] = user["win"] = user["judge"] = 0
 
             self.DB.edit(user)
 

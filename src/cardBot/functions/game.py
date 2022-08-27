@@ -36,7 +36,9 @@ class lobby_status(Enum):
 class player:
     id: int
     role: role
+    reward: bool = True
     lastActivity: int = None
+    
 
 
 @dataclass
@@ -78,7 +80,7 @@ class lobby:
                     conf.dialogs.getDialogPlain(userid=player.id, preset="AFKpun")
                 )
                 playerData["balance"] -= conf["lobby"]["AFK"]["punish"]
-                if player.role is role.player:
+                if player.role is role.player and player.reward:
                     playerData["battles"] -= 1
             else:
                 conf.vk.send(
@@ -102,7 +104,7 @@ class game:
         self.conf = conf
         self.db = db
 
-    def addToLobby(self, id: int, role: role):
+    def addToLobby(self, id: int, role: role, reward: bool = True):
         freeLobby = next(
             (
                 lobby
@@ -120,11 +122,15 @@ class game:
 
         if freeLobby is None:
             self.lobbies.append(
-                lobby(players=[player(id=id, role=role)], lobbyStorage=self.lobbies)
+                lobby(
+                    players=[
+                        player(id=id, role=role, reward = reward)
+                    ], 
+                    lobbyStorage=self.lobbies)
             )
             return
 
-        freeLobby.players.append(player(id=id, role=role))
+        freeLobby.players.append(player(id=id, role=role, reward = reward))
         if len(freeLobby.players) == sum(self.conf["lobby"]["maxPlayers"].values()):
             self.readyLobby(freeLobby)
 
@@ -162,11 +168,11 @@ class game:
 
 class gameFunctions(generalFunctions):
     def game(self, role):
-        if self.lobby.lobbyStatus is not lobby_status.free:
+        if self.data['lobby'].lobbyStatus is not lobby_status.free:
             return
 
         elif "stop" in role:
-            self._game.deletePlayer(self.data["db"]["id"], lobby=self.lobby)
+            self._game.deletePlayer(self.data["db"]["id"], lobby=self.data['lobby'])
 
             self.conf.vk.send(
                 self.conf.dialogs.getDialogPlain(
@@ -175,12 +181,12 @@ class gameFunctions(generalFunctions):
             )
 
     def ready(self, _):
-        playerType = self.__getplayer(self.lobby.getPlayersByRole(role.player))
+        playerType = self.__getplayer(self.data['lobby'].getPlayersByRole(role.player))
 
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
                 ",".join(
-                    map(str, self.lobby.getPlayerIDs(exclude=self.data["db"]["id"]))
+                    map(str, self.data['lobby'].getPlayerIDs(exclude=self.data["db"]["id"]))
                 ),
                 text="{} {}".format(playerType, "готов"),
             )
@@ -195,7 +201,7 @@ class gameFunctions(generalFunctions):
 
     def profile(self, _):
         if (
-            self.data["vk"]["peer_id"] != self.data["vk"]["user"]
+            self.data['isChat']
             or self.data["vk"]["reply_id"]
         ):
             return super().profile(None)
@@ -204,19 +210,18 @@ class gameFunctions(generalFunctions):
             self.conf.dialogs.getDialogParsed(
                 self.data["vk"]["user"]
                 if self.data["vk"]["reply_id"] != self.data["vk"]["user"]
-                and self.data["vk"]["reply_id"] is not None
                 else self.data["vk"]["peer_id"],
                 "profile_game",
                 userdata=self.data["db"],
                 role=self.player.role.title,
-                lobbyStatus=self.lobby.lobbyStatus.title,
+                lobbyStatus=self.data['lobby'].lobbyStatus.title,
             )
         )
 
     def flip(self, _):
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
-                ",".join(map(str, self.lobby.getPlayerIDs())),
+                ",".join(map(str, self.data['lobby'].getPlayerIDs())),
                 preset=choice(["firstPlayer", "secondPlayer"]),
             )
         )
@@ -232,8 +237,8 @@ class gameFunctions(generalFunctions):
 
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
-                ",".join(map(str, self.lobby.getPlayerIDs())),
-                text="Успешно" if random() * 100 <= chance else "Не успешно",
+                ",".join(map(str, self.data['lobby'].getPlayerIDs())),
+                text=f'Шанс {chance}% - {"Успешно" if random() * 100 <= chance else "Не успешно"}',
             )
         )
 
@@ -241,12 +246,12 @@ class gameFunctions(generalFunctions):
         if (
             not cards
             or not isinstance(cards, list)
-            or self.lobby.lobbyStatus is not lobby_status.active
+            or self.data['lobby'].lobbyStatus is not lobby_status.active
         ):
             return super().showCards(cards)
 
         recepients = ",".join(
-            map(str, self.lobby.getPlayerIDs(exclude=self.data["db"]["id"]))
+            map(str, self.data['lobby'].getPlayerIDs(exclude=self.data["db"]["id"]))
         )
         if not recepients:
             return super().showCards(cards)
@@ -284,7 +289,7 @@ class gameFunctions(generalFunctions):
             sendSeparately=False,
         )
 
-        playerType = self.__getplayer(self.lobby.getPlayersByRole(role.player))
+        playerType = self.__getplayer(self.data['lobby'].getPlayersByRole(role.player))
 
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
@@ -297,7 +302,7 @@ class gameFunctions(generalFunctions):
 
     def win(self, playerIDx):
         if (
-            self.lobby.lobbyStatus is not lobby_status.active
+            self.data['lobby'].lobbyStatus is not lobby_status.active
             or self.player.role is not role.judge
             or not playerIDx
             or not playerIDx[-1].isdecimal()
@@ -305,15 +310,28 @@ class gameFunctions(generalFunctions):
             return
 
         playerWinner = int(playerIDx[-1])
-        players = [self.db.get(i.id) for i in self.lobby.getPlayersByRole(role.player)]
-        self.lobby.killLobby()
+        assert playerWinner in range(1, self.conf["lobby"]["maxPlayers"][role.player.id] + 1), 'incorrectPlayer'
+        
+        players = self.data['lobby'].getPlayersByRole(role.player)
 
-        for playeridx, player in enumerate(players, 1):
-            player["battles"] -= 1
+        self.data['lobby'].killLobby()
 
-            self.__giveStat(player, "win" if playeridx == playerWinner else "lose")
+        for playeridx, (player, playerDB) in enumerate(zip(players, [self.db.get(i.id) for i in players]), 1):
+            playerStatus = "win" if playeridx == playerWinner else "lose"
+            
+            if player.reward:
+                playerDB["battles"] -= 1
+                self.__giveStat(playerDB, playerStatus)
+                self.db.edit(playerDB)
 
-            self.db.edit(player)
+            else:
+                self.conf.vk.send(
+                    self.conf.dialogs.getDialogParsed(
+                    player.id,
+                    preset=f"{playerStatus}NoRewardTemplate",
+            )
+        )
+
 
         self.editDB = True
         self.__giveStat(self.data["db"], "judge")
@@ -367,12 +385,12 @@ class gameFunctions(generalFunctions):
             return
 
         recepients = ",".join(
-            map(str, self.lobby.getPlayerIDs(exclude=data["db"]["id"]))
+            map(str, data['lobby'].getPlayerIDs(exclude=data["db"]["id"]))
         )
         if not recepients:
             return
 
-        playerType = self.__getplayer(self.lobby.getPlayersByRole(role.player))
+        playerType = self.__getplayer(data['lobby'].getPlayersByRole(role.player))
 
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
@@ -385,24 +403,25 @@ class gameFunctions(generalFunctions):
     def __init__(
         self,
         conf: config,
-        lobby: lobby = None,
-        data=None,
-        payload=None,
+        data: dict=None,
         db=None,
         game: game = None,
     ):
-        self.lobby = lobby
         self.conf = conf
         self.editDB = False
-        self.player = lobby.getPlayerByID(data["db"]["id"])
+        self.player = data['lobby'].getPlayerByID(data["db"]["id"])
 
-        if self.lobby.lobbyStatus is not lobby_status.free:
+        if data['lobby'].lobbyStatus is not lobby_status.free:
             self.player.lastActivity = time()
 
-        if None in payload or "ready" in payload or not isinstance(payload, list):
+        if (
+            None in data.get('payload') or 
+            "ready" in data.get('payload')
+            or not isinstance(data.get('payload'), list)
+        ):
             return self.__chat(data)
 
-        super().__init__(conf, data, payload, db, game)
+        super().__init__(conf, data, db, game)
 
     def __getplayer(self, playerList):
         try:
