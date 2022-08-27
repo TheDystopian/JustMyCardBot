@@ -73,8 +73,6 @@ class generalFunctions:
 
     def showCards(self, cards):
         assert self.data["db"]["cards"], "noCards"
-
-        isChat = self.data["vk"]["user"] != self.data["vk"]["peer_id"]
         showPict = False
 
         cardData = self.conf.cards.getOwnedCards(self.data["db"]["cards"])
@@ -110,7 +108,7 @@ class generalFunctions:
 
         assert cardData, "noCards"
 
-        if not isChat or showPict:
+        if not self.data['isChat'] or showPict:
             [
                 self.conf.vk.send(
                     self.conf.dialogs.getDialogPlain(
@@ -244,7 +242,7 @@ class generalFunctions:
                 else 1
             )
 
-        elif thing.get("cards", False) != False:
+        elif thing.get("cards"):
             cardData = thing.get("cards")
 
             if cardData[-1].lstrip("-").isdecimal():
@@ -308,7 +306,7 @@ class generalFunctions:
                         key: -val
                         for key, val in self.conf["status"]["status"][user["status"]][
                             "streak"
-                        ]["win"]["count"].items()
+                        ]["win"]["reward"].items()
                     },
                 )
 
@@ -318,8 +316,8 @@ class generalFunctions:
                 | {
                     key: -val
                     for key, val in self.conf["status"]["status"][user["status"]][
-                        "streak"
-                    ]["win"]["reward"].items()
+                        "battles"
+                    ]["win"].items()
                 },
             )
 
@@ -338,7 +336,7 @@ class generalFunctions:
                         key: -val
                         for key, val in self.conf["status"]["status"][user["status"]][
                             "streak"
-                        ]["lose"]["count"].items()
+                        ]["lose"]["reward"].items()
                     },
                 )
 
@@ -348,7 +346,7 @@ class generalFunctions:
                 | {
                     key: -val
                     for key, val in self.conf["status"]["status"][user["status"]][
-                        "streak"
+                        "battles"
                     ]["lose"]["reward"].items()
                 },
             )
@@ -392,17 +390,12 @@ class generalFunctions:
         self.db.edit(user)
 
     def profile(self, _):
-        isAdmin = self.conf.vk.isAdmin(
-            self.data["vk"]["peer_id"], self.data["vk"]["user"]
-        )
-        isChat = self.data["vk"]["peer_id"] != self.data["vk"]["user"]
-
         if self.data["vk"]["reply_id"]:
             userData = self.db.get(user=self.data["vk"]["reply_id"])
         else:
             userData = self.data["db"]
 
-        if isAdmin:
+        if self.data.get('isAdmin'):
             self.conf.vk.send(
                 self.conf.dialogs.getDialogParsed(
                     self.data["vk"]["user"]
@@ -412,7 +405,7 @@ class generalFunctions:
                     "profile",
                     userdata=userData,
                 )
-                | ({"keyboard": None} if isChat else {})
+                | ({"keyboard": None} if self.data['isChat'] else {})
             )
             return
 
@@ -425,7 +418,7 @@ class generalFunctions:
                 else "profile",
                 userdata=userData,
             )
-            | ({"keyboard": None} if isChat else {})
+            | ({"keyboard": None} if self.data['isChat'] else {})
         )
 
     def chance(self, chance):
@@ -440,7 +433,7 @@ class generalFunctions:
         self.conf.vk.send(
             self.conf.dialogs.getDialogPlain(
                 self.data["vk"]["peer_id"],
-                text="Успешно" if random() * 100 <= chance else "Не успешно",
+                text=f'Шанс {chance}% - {"Успешно" if random() * 100 <= chance else "Не успешно"}',
             )
         )
 
@@ -572,13 +565,11 @@ class generalFunctions:
 
     def game(self, _role):
         if "stop" in _role:
-            self.payload.append({"dialog": "profile"})
+            self.data['payload'].append({"dialog": "profile"})
             return
 
         if "random" in _role:
             _role = choice(("player", "judge"))
-
-        assert _role != "player" or self.data["db"]["battles"] > 0, "nobattles"
 
         self.conf.vk.send(
             self.conf.dialogs.getDialogParsed(
@@ -588,7 +579,7 @@ class generalFunctions:
             )
         )
 
-        self._game.addToLobby(self.data["db"]["id"], getattr(funcgame.role, _role))
+        self._game.addToLobby(self.data["db"]["id"], getattr(funcgame.role, _role), reward = self.data["db"]["battles"] > 0)
 
     def trade(self, tradeData):
         assert tradeData and isinstance(tradeData, dict), "cantTrade"
@@ -688,7 +679,6 @@ class generalFunctions:
         self,
         conf: config,
         data: dict = None,
-        payload: list[dict] = None,
         db: DB = None,
         _game=None,
     ):
@@ -698,12 +688,11 @@ class generalFunctions:
         self.editDB = False
 
         self.data = data
-        self.payload = payload
 
-        if not isinstance(self.payload, list):
+        if not isinstance(self.data.get('payload'), list):
             return
 
-        for func in self.payload:
+        for func in self.data.get('payload'):
             if not func:
                 continue
 
