@@ -347,7 +347,7 @@ class generalFunctions:
                     key: -val
                     for key, val in self.conf["status"]["status"][user["status"]][
                         "battles"
-                    ]["lose"]["reward"].items()
+                    ]["lose"].items()
                 },
             )
 
@@ -579,7 +579,13 @@ class generalFunctions:
             )
         )
 
-        self._game.addToLobby(self.data["db"]["id"], getattr(funcgame.role, _role), reward = self.data["db"]["battles"] > 0)
+        self._game.addToLobby(
+            id = self.data["db"]["id"],
+            playerRole = getattr(funcgame.role, _role),
+            reward = self.data["db"]["battles"] > 0,
+            safe = self.data["db"]['experience'] <= self.conf['lobby']['safeLobby']['maxRank']
+            
+        )
 
     def trade(self, tradeData):
         assert tradeData and isinstance(tradeData, dict), "cantTrade"
@@ -647,7 +653,7 @@ class generalFunctions:
         )
 
         if count:
-            users = users[: int(count[-1])]
+            users = users[:int(count[-1])]
 
         users = [
             (place, user, exp)

@@ -5,7 +5,7 @@ from functions.card_utils import botUtils
 from functions.functions import generalFunctions
 from dataclasses import dataclass, field
 from enum import Enum
-from random import choice, random, randrange
+from random import choice, random
 
 import components.config as config
 from time import time
@@ -21,7 +21,6 @@ class role(Enum):
         self.title = title
         self.id = id
 
-
 class lobby_status(Enum):
     """Lobby statuses"""
 
@@ -31,22 +30,23 @@ class lobby_status(Enum):
     def __init__(self, title):
         self.title = title
 
-
 @dataclass
 class player:
     id: int
     role: role
     reward: bool = True
     lastActivity: int = None
-    
-
 
 @dataclass
 class lobby:
+    conf: config
     timeoutTask: Thread = None
+    safeSwitch: Thread = None
     players: list[player] = field(default_factory=lambda: [])
     lobbyStatus: lobby_status = lobby_status.free
     lobbyStorage: list = None
+    safe: bool = False
+    creationTime: int = int(time())
 
     def getPlayersByRole(self, role: role) -> list[player]:
         return [player for player in self.players if player.role is role]
@@ -57,36 +57,34 @@ class lobby:
     def getPlayerByID(self, id: int) -> player:
         return next((player for player in self.players if player.id == id), None)
 
-    def timeout(self, conf: config):
-        # Operate
-
+    def timeout(self):
         while True:
             if getattr(self, "kill", False):
                 return
 
             if any(
-                time() - player.lastActivity > conf["lobby"].get("timeout", 60)
+                time() - player.lastActivity > self.conf["lobby"].get("timeout", 60)
                 for player in self.players
             ):
                 break
 
-        db = conf.DBConn()
+        db = self.conf.DBConn()
 
         for player in self.players:
             playerData = db.get(player.id)
 
-            if time() - player.lastActivity > conf["lobby"].get("timeout", 60):
-                conf.vk.send(
-                    conf.dialogs.getDialogPlain(userid=player.id, preset="AFKpun")
+            if time() - player.lastActivity > self.conf["lobby"].get("timeout", 60):
+                self.conf.vk.send(
+                    self.conf.dialogs.getDialogPlain(userid=player.id, preset="AFKpun")
                 )
-                playerData["balance"] -= conf["lobby"]["AFK"]["punish"]
+                playerData["balance"] -= self.conf["lobby"]["AFK"]["punish"]
                 if player.role is role.player and player.reward:
                     playerData["battles"] -= 1
             else:
-                conf.vk.send(
-                    conf.dialogs.getDialogPlain(userid=player.id, preset="AFKcomp")
+                self.conf.vk.send(
+                    self.conf.dialogs.getDialogPlain(userid=player.id, preset="AFKcomp")
                 )
-                playerData["balance"] += conf["lobby"]["AFK"]["compensation"]
+                playerData["balance"] += self.conf["lobby"]["AFK"]["compensation"]
 
             db.edit(playerData)
 
@@ -94,8 +92,51 @@ class lobby:
 
     def killLobby(self):
         self.kill = True
-        self.lobbyStorage.remove(self)
+        if self in self.lobbyStorage:
+            self.lobbyStorage.remove(self)
 
+    def isFullLobby(self):
+        return len(self.players) == sum(self.conf["lobby"]["maxPlayers"].values())
+
+    def safeUndefine(self, game):
+        while True:
+            if self.lobbyStatus is not lobby_status.free:
+                return
+            
+            if time() - self.creationTime > self.conf['lobby']['safeLobby']['timeout']:
+                break
+        
+        killLobby = True
+        for player in self.players:
+            nextLobby = game.findFreeLobby(player.role, safe = None)
+            
+            if nextLobby is None: 
+                killLobby, self.safe = False, None
+                
+                self.conf.vk.send(
+                    self.conf.dialogs.getDialogPlain(
+                        ','.join(map(str, self.getPlayerIDs())),
+                        preset = 'undefinedLobbySwitch'
+                    )
+                )
+                break
+
+            nextLobby.players.append(player)
+            self.players.remove(player)
+
+            if nextLobby.isFullLobby():
+                game.readyLobby(nextLobby)
+
+
+            self.conf.vk.send(
+                self.conf.dialogs.getDialogPlain(
+                    player.id,
+                    preset = 'switchLobby'
+                )
+            )
+
+        if killLobby:   
+            self.killLobby()
 
 class game:
     lobbies: list[lobby] = []
@@ -104,34 +145,58 @@ class game:
         self.conf = conf
         self.db = db
 
-    def addToLobby(self, id: int, role: role, reward: bool = True):
-        freeLobby = next(
+    def findFreeLobby(self, role: role, *, safe: bool = False):
+        return next(
             (
                 lobby
                 for lobby in self.lobbies
                 if lobby.lobbyStatus is lobby_status.free
-                and len([player for player in lobby.players if player.role is role])
+                and len(lobby.getPlayersByRole(role))
                 < self.conf["lobby"]["maxPlayers"][role.id]
+                and (lobby.safe is None or safe is None or lobby.safe is safe)
             ),
             None,
         )
-
+        
+    def addToLobby(self, id: int, playerRole: role, reward: bool = True, safe: bool = True):
         self.conf.vk.send(
-            self.conf.dialogs.getDialogPlain(userid=id, preset="lobbySearch")
+           self.conf.dialogs.getDialogPlain(userid=id, preset="lobbySearch")
+        )
+        
+        freeLobby = self.findFreeLobby(
+            playerRole, 
+            safe = safe if safe or playerRole is not role.judge else None
         )
 
         if freeLobby is None:
-            self.lobbies.append(
-                lobby(
-                    players=[
-                        player(id=id, role=role, reward = reward)
-                    ], 
-                    lobbyStorage=self.lobbies)
+            freeLobby = lobby(
+                players=[
+                    player(id=id, role=playerRole, reward = reward)
+                ], 
+                lobbyStorage=self.lobbies,
+                safe = safe,
+                conf = self.conf
             )
+            if safe:
+                freeLobby.safeSwitch = Thread(
+                target=freeLobby.safeUndefine,
+                args=(self,),
+                daemon=True,
+            )
+                freeLobby.safeSwitch.start()
+            self.lobbies.append(freeLobby)
+
+
             return
 
-        freeLobby.players.append(player(id=id, role=role, reward = reward))
-        if len(freeLobby.players) == sum(self.conf["lobby"]["maxPlayers"].values()):
+        freeLobby.players.append(
+            player(
+                id=id, 
+                role=playerRole,
+                reward = reward,
+            )
+        )
+        if freeLobby.isFullLobby():
             self.readyLobby(freeLobby)
 
     def readyLobby(self, lobby: lobby):
@@ -145,7 +210,7 @@ class game:
         for player in lobby.players:
             player.lastActivity = time()
 
-        lobby.timeoutTask = Thread(target=lobby.timeout, args=(self.conf,), daemon=True)
+        lobby.timeoutTask = Thread(target=lobby.timeout, daemon=True)
         lobby.timeoutTask.start()
 
     def deletePlayer(self, id: int, *, lobby: lobby = None):
@@ -157,6 +222,8 @@ class game:
             lobby.players.remove(
                 next((player for player in lobby.players if player.id == id))
             )
+            if not lobby.players:
+                lobby.killLobby()
         finally:
             pass
 
